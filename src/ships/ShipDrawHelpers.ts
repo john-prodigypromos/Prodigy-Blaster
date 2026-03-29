@@ -237,6 +237,7 @@ export function drawSpecularHighlight(
 
 /**
  * Draw an engine thruster flame — gradient cone from hot white core to transparent.
+ * Includes heat shimmer rings.
  */
 export function drawThrusterFlame(
   ctx: CanvasRenderingContext2D,
@@ -283,6 +284,18 @@ export function drawThrusterFlame(
   ctx.arc(x, y, width * 0.8, 0, Math.PI * 2);
   ctx.fill();
 
+  // Heat shimmer rings along the flame
+  for (let i = 1; i <= 3; i++) {
+    const ringY = y + length * (i * 0.2);
+    const ringW = width * (1 - i * 0.2) * 0.4;
+    const ringAlpha = 0.12 - i * 0.03;
+    ctx.strokeStyle = `rgba(255,200,120,${ringAlpha})`;
+    ctx.lineWidth = 0.6;
+    ctx.beginPath();
+    ctx.ellipse(x, ringY, ringW, ringW * 0.3, 0, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+
   ctx.restore();
 }
 
@@ -319,6 +332,86 @@ export function drawNavLight(
   ctx.arc(x - radius * 0.2, y - radius * 0.2, radius * 0.4, 0, Math.PI * 2);
   ctx.fill();
 
+  ctx.restore();
+}
+
+/**
+ * Draw rectangular hull plating outlines — subtle rectangles on the hull surface.
+ */
+export function drawHullPlating(
+  ctx: CanvasRenderingContext2D,
+  x: number, y: number,
+  width: number, height: number,
+  alpha = 0.08,
+): void {
+  ctx.save();
+  ctx.strokeStyle = `rgba(0,0,0,${alpha})`;
+  ctx.lineWidth = 0.5;
+  ctx.strokeRect(x, y, width, height);
+  // Top-left highlight
+  ctx.strokeStyle = `rgba(255,255,255,${alpha * 0.6})`;
+  ctx.lineWidth = 0.3;
+  ctx.beginPath();
+  ctx.moveTo(x, y + height);
+  ctx.lineTo(x, y);
+  ctx.lineTo(x + width, y);
+  ctx.stroke();
+  ctx.restore();
+}
+
+/**
+ * Draw cross-hatching texture in a region for wing surface detail.
+ */
+export function drawCrossHatching(
+  ctx: CanvasRenderingContext2D,
+  x: number, y: number,
+  width: number, height: number,
+  spacing = 4,
+  alpha = 0.04,
+): void {
+  ctx.save();
+  ctx.strokeStyle = `rgba(0,0,0,${alpha})`;
+  ctx.lineWidth = 0.3;
+
+  // Diagonal lines one direction
+  for (let i = -height; i < width + height; i += spacing) {
+    ctx.beginPath();
+    ctx.moveTo(x + i, y);
+    ctx.lineTo(x + i - height, y + height);
+    ctx.stroke();
+  }
+
+  // Diagonal lines other direction
+  for (let i = -height; i < width + height; i += spacing) {
+    ctx.beginPath();
+    ctx.moveTo(x + i, y);
+    ctx.lineTo(x + i + height, y + height);
+    ctx.stroke();
+  }
+
+  ctx.restore();
+}
+
+/**
+ * Draw panel seam cross-marks at intersection points.
+ */
+export function drawCrossMark(
+  ctx: CanvasRenderingContext2D,
+  x: number, y: number,
+  size = 2,
+  alpha = 0.15,
+): void {
+  ctx.save();
+  ctx.strokeStyle = `rgba(0,0,0,${alpha})`;
+  ctx.lineWidth = 0.5;
+  ctx.beginPath();
+  ctx.moveTo(x - size, y - size);
+  ctx.lineTo(x + size, y + size);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(x + size, y - size);
+  ctx.lineTo(x - size, y + size);
+  ctx.stroke();
   ctx.restore();
 }
 
