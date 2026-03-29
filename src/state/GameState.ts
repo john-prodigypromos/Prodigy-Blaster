@@ -1,96 +1,66 @@
-export interface InventorySlot {
-  itemId: string;
-  quantity: number;
-  equipped: boolean;
-}
-
-export interface GameStateData {
-  player: {
-    hp: number;
-    maxHp: number;
-    rupees: number;
-    keys: number;
+export interface ArenaState {
+  currentOpponent: number;
+  score: number;
+  highScores: number[];
+  ladderDefeated: boolean[];
+  cybertruckUnlocked: boolean;
+  settings: {
+    sfxVolume: number;
+    musicVolume: number;
+    screenShake: boolean;
   };
-  inventory: InventorySlot[];
-  equippedSword: string | null;
-  equippedItem: string | null;
-  flags: Record<string, boolean>;
-  currentMap: string;
 }
 
-const DEFAULT_STATE: GameStateData = {
-  player: {
-    hp: 6,
-    maxHp: 6,
-    rupees: 0,
-    keys: 0,
+const DEFAULT_STATE: ArenaState = {
+  currentOpponent: 0,
+  score: 0,
+  highScores: new Array(16).fill(0),
+  ladderDefeated: new Array(16).fill(false),
+  cybertruckUnlocked: false,
+  settings: {
+    sfxVolume: 0.7,
+    musicVolume: 0.5,
+    screenShake: true,
   },
-  inventory: [],
-  equippedSword: 'wooden_sword',
-  equippedItem: null,
-  flags: {},
-  currentMap: 'overworld',
 };
 
-/**
- * Singleton game state — survives scene transitions.
- * Call GameState.save() to persist to localStorage.
- */
 class GameStateManager {
-  private data: GameStateData;
+  private data: ArenaState;
 
   constructor() {
     this.data = structuredClone(DEFAULT_STATE);
   }
 
-  get player() { return this.data.player; }
-  get inventory() { return this.data.inventory; }
-  get flags() { return this.data.flags; }
-  get currentMap() { return this.data.currentMap; }
+  get state(): ArenaState { return this.data; }
+  get currentOpponent(): number { return this.data.currentOpponent; }
+  get score(): number { return this.data.score; }
 
-  set currentMap(map: string) { this.data.currentMap = map; }
-
-  // ── Flag helpers ──
-  setFlag(key: string, value = true): void { this.data.flags[key] = value; }
-  hasFlag(key: string): boolean { return this.data.flags[key] === true; }
-
-  // ── Player helpers ──
-  heal(amount: number): void {
-    this.data.player.hp = Math.min(this.data.player.hp + amount, this.data.player.maxHp);
+  addScore(points: number): void {
+    this.data.score += points;
   }
 
-  takeDamage(amount: number): number {
-    const actual = Math.max(amount, 1);
-    this.data.player.hp = Math.max(this.data.player.hp - actual, 0);
-    return actual;
-  }
-
-  get isPlayerDead(): boolean { return this.data.player.hp <= 0; }
-
-  // ── Inventory helpers ──
-  addItem(itemId: string, quantity = 1): void {
-    const existing = this.data.inventory.find(s => s.itemId === itemId);
-    if (existing) {
-      existing.quantity += quantity;
-    } else {
-      this.data.inventory.push({ itemId, quantity, equipped: false });
+  recordVictory(opponentIndex: number, matchScore: number): void {
+    this.data.ladderDefeated[opponentIndex] = true;
+    if (matchScore > this.data.highScores[opponentIndex]) {
+      this.data.highScores[opponentIndex] = matchScore;
+    }
+    if (opponentIndex < 15) {
+      this.data.currentOpponent = opponentIndex + 1;
+    }
+    if (opponentIndex === 15) {
+      this.data.cybertruckUnlocked = true;
     }
   }
 
-  hasItem(itemId: string): boolean {
-    return this.data.inventory.some(s => s.itemId === itemId && s.quantity > 0);
-  }
-
-  // ── Save / Load ──
   save(): void {
-    localStorage.setItem('ohyum_save', JSON.stringify(this.data));
+    localStorage.setItem('ohyum_arena_save', JSON.stringify(this.data));
   }
 
   load(): boolean {
-    const raw = localStorage.getItem('ohyum_save');
+    const raw = localStorage.getItem('ohyum_arena_save');
     if (!raw) return false;
     try {
-      this.data = JSON.parse(raw) as GameStateData;
+      this.data = JSON.parse(raw) as ArenaState;
       return true;
     } catch {
       return false;
