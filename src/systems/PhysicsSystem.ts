@@ -95,7 +95,7 @@ export class PhysicsSystem {
     }
 
     ship.sprite.setPosition(finalX, finalY);
-    ship.sprite.setRotation(ship.rotation + Math.PI / 2);
+    ship.updateSpriteFrame();
 
     return hitWall;
   }

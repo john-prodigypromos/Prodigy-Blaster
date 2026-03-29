@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { SHIP } from '../config';
+import { rotationToFrame } from '../ships/ShipSpriteGenerator';
 
 export interface ShipConfig {
   hull: number;
@@ -27,7 +28,7 @@ export class Ship {
   lastFireTime: number;
 
   constructor(scene: Phaser.Scene, x: number, y: number, config: ShipConfig) {
-    this.sprite = scene.physics.add.sprite(x, y, config.textureKey);
+    this.sprite = scene.physics.add.sprite(x, y, config.textureKey, 0);
     this.sprite.setCircle(config.hitboxRadius);
     this.sprite.setOffset(
       this.sprite.width / 2 - config.hitboxRadius,
@@ -47,6 +48,15 @@ export class Ship {
     this.lastDamageTime = 0;
     this.alive = true;
     this.lastFireTime = 0;
+  }
+
+  /**
+   * Update the sprite frame to match the current rotation angle.
+   * Call this instead of sprite.setRotation().
+   */
+  updateSpriteFrame(): void {
+    const frame = rotationToFrame(this.rotation);
+    this.sprite.setFrame(frame);
   }
 
   /** Check invincibility — pass current game time (ms) */
