@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { COLORS } from '../config';
-import { generateShipSpriteSheet } from '../ships/ShipSpriteGenerator';
+import { generateShipSpriteSheet, stampLogoOnSpriteSheet } from '../ships/ShipSpriteGenerator';
 import { drawPlayerShip, PLAYER_FRAME_SIZE } from '../ships/PlayerShipRenderer';
 import { drawEnemyShip, ENEMY_FRAME_SIZE } from '../ships/EnemyShipRenderer';
 
@@ -13,12 +13,18 @@ export class BootScene extends Phaser.Scene {
     // Character portraits
     this.load.image('portrait_owen', 'assets/owen.jpg');
     this.load.image('portrait_william', 'assets/william.jpg');
+    this.load.image('logo_player', 'assets/prodigy.png');
+    this.load.image('logo_enemy', 'assets/vox.png');
   }
 
   create(): void {
-    // HD canvas-rendered ship sprite sheets (72 rotation frames each)
+    // HD canvas-rendered ship sprite sheets (36 rotation frames each)
     generateShipSpriteSheet(this, 'ship_player', drawPlayerShip, PLAYER_FRAME_SIZE, 42);
     generateShipSpriteSheet(this, 'ship_enemy', drawEnemyShip, ENEMY_FRAME_SIZE, 137);
+
+    // Stamp logos onto ship bodies
+    stampLogoOnSpriteSheet(this, 'ship_player', 'logo_player', PLAYER_FRAME_SIZE, 28, 5);
+    stampLogoOnSpriteSheet(this, 'ship_enemy', 'logo_enemy', ENEMY_FRAME_SIZE, 28, 5);
 
     // Bolts are now drawn as Graphics objects — no textures needed
 

@@ -61,6 +61,63 @@ export function generateShipSpriteSheet(
 }
 
 /**
+ * Stamp a logo image onto every frame of an existing ship sprite sheet.
+ * The logo is drawn at the center of each frame, rotated to match the ship's angle.
+ */
+export function stampLogoOnSpriteSheet(
+  scene: Phaser.Scene,
+  sheetKey: string,
+  logoKey: string,
+  frameSize: number,
+  logoSize: number,
+  offsetY = 0,
+): void {
+  const sheetTex = scene.textures.get(sheetKey);
+  if (!sheetTex || !sheetTex.source[0]) return;
+
+  const logoTex = scene.textures.get(logoKey);
+  if (!logoTex || !logoTex.source[0]) return;
+
+  const logoImg = logoTex.source[0].image as HTMLImageElement;
+  if (!logoImg || !logoImg.complete) return;
+
+  // Get the sheet canvas
+  const sheetCanvas = sheetTex.source[0].image as HTMLCanvasElement;
+  if (!sheetCanvas || !sheetCanvas.getContext) return;
+
+  const ctx = sheetCanvas.getContext('2d')!;
+  const cols = GRID_COLS;
+
+  for (let i = 0; i < ROTATION_FRAMES; i++) {
+    const col = i % cols;
+    const row = Math.floor(i / cols);
+    const angle = (i * DEGREES_PER_FRAME * Math.PI) / 180;
+
+    const cx = col * frameSize + frameSize / 2;
+    const cy = row * frameSize + frameSize / 2;
+
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(angle);
+
+    // Draw logo centered on ship body, with optional Y offset
+    const aspect = logoImg.width / logoImg.height;
+    let lw = logoSize, lh = logoSize;
+    if (aspect > 1) lh = logoSize / aspect;
+    else lw = logoSize * aspect;
+
+    ctx.globalAlpha = 0.8;
+    ctx.drawImage(logoImg, -lw / 2, -lh / 2 + offsetY, lw, lh);
+    ctx.globalAlpha = 1;
+
+    ctx.restore();
+  }
+
+  // Refresh the texture so Phaser picks up the changes
+  sheetTex.refresh();
+}
+
+/**
  * Convert a rotation angle (radians) to the nearest sprite frame index.
  * Frame 0 = pointing UP, increases clockwise.
  */
