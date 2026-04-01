@@ -20,7 +20,7 @@ const config: Phaser.Types.Core.GameConfig = {
   },
   scene: [BootScene, TitleScene, CharacterSelectScene, ArenaScene],
   scale: {
-    mode: Phaser.Scale.FIT,
+    mode: Phaser.Scale.ENVELOP,
     autoCenter: Phaser.Scale.CENTER_BOTH,
     expandParent: true,
     // Let Phaser resize when orientation changes
