@@ -493,27 +493,20 @@ export class ArenaScene extends Phaser.Scene {
       });
     }
 
-    const headline = result === 'win'
-      ? 'YOU WON!\nHUMANITY HAS BEEN SAVED!'
-      : 'YOU LOST!\nTRY AGAIN LOSER!';
+    if (result === 'win') {
+      // Win: show headline briefly, then go to high score entry
+      const textY = h / 2 + 100;
+      this.add.text(w / 2, textY, 'YOU WON!\nHUMANITY HAS BEEN SAVED!', {
+        fontSize: '28px',
+        fontFamily: 'Arial, sans-serif',
+        fontStyle: 'bold',
+        color: '#00ff66',
+        align: 'center',
+        stroke: '#000000',
+        strokeThickness: 3,
+      }).setOrigin(0.5, 0.5).setDepth(200);
 
-    const textY = result === 'lose' ? h / 2 + 130 : h / 2 + 100;
-    this.add.text(w / 2, textY, headline, {
-      fontSize: '28px',
-      fontFamily: 'Arial, sans-serif',
-      fontStyle: 'bold',
-      color: result === 'win' ? '#00ff66' : '#ff4444',
-      align: 'center',
-      stroke: '#000000',
-      strokeThickness: 3,
-    }).setOrigin(0.5, 0.5).setDepth(200);
-
-    const subline = result === 'win'
-      ? `SCORE: ${this.score.toLocaleString()}`
-      : '';
-
-    if (subline) {
-      this.add.text(w / 2, textY + 40, subline, {
+      this.add.text(w / 2, textY + 40, `SCORE: ${this.score.toLocaleString()}`, {
         fontSize: '20px',
         fontFamily: 'Arial, sans-serif',
         fontStyle: 'bold',
@@ -522,26 +515,53 @@ export class ArenaScene extends Phaser.Scene {
         stroke: '#000000',
         strokeThickness: 2,
       }).setOrigin(0.5, 0.5).setDepth(200);
+
+      // After celebration, transition to high score entry
+      const level = getCurrentLevel();
+      this.time.delayedCall(2500, () => {
+        this.weapons.clear();
+        this.hud.destroy();
+        this.touchControls.destroy();
+        this.sound_sys.stopThrust();
+        this.sound_sys.stopMusic();
+        resetLevelState();
+        this.scene.start('HighScore', {
+          score: this.score,
+          level: level.level,
+          difficulty: currentDifficulty,
+        });
+      });
+    } else {
+      // Lose: show headline + press ENTER
+      const textY = h / 2 + 130;
+      this.add.text(w / 2, textY, 'YOU LOST!\nTRY AGAIN LOSER!', {
+        fontSize: '28px',
+        fontFamily: 'Arial, sans-serif',
+        fontStyle: 'bold',
+        color: '#ff4444',
+        align: 'center',
+        stroke: '#000000',
+        strokeThickness: 3,
+      }).setOrigin(0.5, 0.5).setDepth(200);
+
+      this.add.text(w / 2, textY + 50, 'Press ENTER for menu', {
+        fontSize: '14px',
+        fontFamily: 'Arial, sans-serif',
+        color: '#ffffff',
+        align: 'center',
+      }).setOrigin(0.5, 0.5).setDepth(200);
+
+      const goToTitle = () => {
+        this.weapons.clear();
+        this.hud.destroy();
+        this.touchControls.destroy();
+        this.sound_sys.stopThrust();
+        this.sound_sys.stopMusic();
+        resetLevelState();
+        this.scene.start('Title');
+      };
+      this.input.keyboard!.once('keydown-ENTER', goToTitle);
+      this.input.once('pointerdown', goToTitle);
     }
-
-    this.add.text(w / 2, textY + 70, 'Press ENTER for menu', {
-      fontSize: '14px',
-      fontFamily: 'Arial, sans-serif',
-      color: '#ffffff',
-      align: 'center',
-    }).setOrigin(0.5, 0.5).setDepth(200);
-
-    // Return to title on ENTER or tap
-    const goToTitle = () => {
-      this.weapons.clear();
-      this.hud.destroy();
-      this.touchControls.destroy();
-      this.sound_sys.stopThrust();
-      this.sound_sys.stopMusic();
-      resetLevelState();
-      this.scene.start('Title');
-    };
-    this.input.keyboard!.once('keydown-ENTER', goToTitle);
-    this.input.once('pointerdown', goToTitle);
   }
 }

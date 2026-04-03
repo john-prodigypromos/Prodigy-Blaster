@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { COLORS, getGameSize } from '../config';
 import { DifficultyLevel, DIFFICULTY, setDifficulty } from '../state/Difficulty';
+import { getHighScores } from '../state/HighScores';
 import { createStarfieldTexture } from '../ui/Starfield';
 
 export class TitleScene extends Phaser.Scene {
@@ -45,6 +46,31 @@ export class TitleScene extends Phaser.Scene {
 
     for (const lvl of levels) {
       this.createDifficultyButton(lvl.key, lvl.color, lvl.y, lvl.desc, w);
+    }
+
+    // ── High Scores (right side) ──
+    const scores = getHighScores();
+    if (scores.length > 0) {
+      const hsX = w * 0.82;
+      const hsTop = 160;
+      this.add.text(hsX, hsTop, 'HIGH SCORES', {
+        fontSize: '16px', fontFamily: 'Arial, sans-serif', fontStyle: 'bold',
+        color: '#ffcc00', stroke: '#000000', strokeThickness: 2,
+      }).setOrigin(0.5, 0);
+
+      const top5 = scores.slice(0, 5);
+      for (let i = 0; i < top5.length; i++) {
+        const entry = top5[i];
+        const y = hsTop + 30 + i * 26;
+        this.add.text(hsX - 80, y, `${i + 1}. ${entry.name}`, {
+          fontSize: '13px', fontFamily: 'Arial, sans-serif',
+          color: '#ffffff', stroke: '#000000', strokeThickness: 1,
+        }).setDepth(100);
+        this.add.text(hsX + 80, y, entry.score.toLocaleString(), {
+          fontSize: '13px', fontFamily: 'Arial, sans-serif', fontStyle: 'bold',
+          color: '#ffcc00', stroke: '#000000', strokeThickness: 1,
+        }).setOrigin(1, 0).setDepth(100);
+      }
     }
 
     // ── Footer ──

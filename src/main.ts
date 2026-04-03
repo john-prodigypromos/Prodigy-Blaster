@@ -5,6 +5,7 @@ import { TitleScene } from './scenes/TitleScene';
 import { CharacterSelectScene } from './scenes/CharacterSelectScene';
 import { LevelIntroScene } from './scenes/LevelIntroScene';
 import { ArenaScene } from './scenes/ArenaScene';
+import { HighScoreScene } from './scenes/HighScoreScene';
 
 // Calculate game width from the actual container, not window
 // This avoids iOS safe-area and toolbar measurement issues
@@ -38,7 +39,7 @@ const config: Phaser.Types.Core.GameConfig = {
       debug: false,
     },
   },
-  scene: [BootScene, TitleScene, CharacterSelectScene, LevelIntroScene, ArenaScene],
+  scene: [BootScene, TitleScene, CharacterSelectScene, LevelIntroScene, ArenaScene, HighScoreScene],
   scale: {
     mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH,
