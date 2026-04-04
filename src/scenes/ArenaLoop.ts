@@ -156,10 +156,12 @@ export function updateArena(
   const vertSpeed = 60;
   player.position.y += mouse.verticalMove * vertSpeed * dt;
 
-  // ── Player weapons ──
-  // Desktop: space bar only | Mobile: touch fire button
+  // ── Player weapons — auto-aim at nearest alive enemy ──
   if (keys['Space'] || touch.fire) {
-    if (tryFireWeapon(player, boltPool, now)) {
+    const nearestEnemy = enemies
+      .filter(e => e.alive)
+      .sort((a, b) => a.position.distanceTo(player.position) - b.position.distanceTo(player.position))[0];
+    if (tryFireWeapon(player, boltPool, now, undefined, nearestEnemy)) {
       state.sound.playerShoot();
     }
   }
@@ -174,13 +176,13 @@ export function updateArena(
 
     const aiInput = enemyAIs[i].update(enemy, player, dt, now);
     if (aiInput.fire) {
-      if (tryFireWeapon(enemy, boltPool, now)) {
+      if (tryFireWeapon(enemy, boltPool, now, undefined, player)) {
         state.sound.enemyShoot();
       }
     }
-    // Also force-fire every 300ms regardless of AI decision
+    // Force-fire every 300ms as backup
     if (now - enemy.lastFireTime > 300) {
-      tryFireWeapon(enemy, boltPool, now);
+      tryFireWeapon(enemy, boltPool, now, undefined, player);
     }
     // AI directly controls enemy position — skip physics
   }
