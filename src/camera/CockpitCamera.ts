@@ -13,8 +13,8 @@ export class CockpitCamera {
   private shakeIntensity = 0;
   private shakeDecay = 5; // per second
 
-  // Camera in cockpit — high enough to see nose below, far enough back to see wings
-  private offset = new THREE.Vector3(0, 1.2, 0.5);
+  // Camera in cockpit — positioned to see nose, wings, and dashboard area
+  private offset = new THREE.Vector3(0, 1.0, -0.5);
 
   // Temp vectors to avoid GC
   private _worldPos = new THREE.Vector3();
@@ -32,8 +32,8 @@ export class CockpitCamera {
     this._worldOffset.applyQuaternion(player.quaternion);
     this._worldPos.copy(player.position).add(this._worldOffset);
 
-    // Smooth follow — lerp camera position toward target
-    this.camera.position.lerp(this._worldPos, Math.min(1, dt * 12));
+    // Tight follow — near-instant position tracking
+    this.camera.position.lerp(this._worldPos, Math.min(1, dt * 30));
 
     // Look target — slightly ahead of ship
     const forward = player.getForward();
@@ -41,7 +41,7 @@ export class CockpitCamera {
     this.camera.lookAt(this._lookTarget);
 
     // ── Roll on turns ──
-    this.targetRoll = -yawInput * 0.35; // roll opposite to turn direction
+    this.targetRoll = -yawInput * 0.15; // subtle roll on turns
     this.currentRoll = THREE.MathUtils.lerp(this.currentRoll, this.targetRoll, Math.min(1, dt * 5));
     this.camera.rotation.z = this.currentRoll;
 
