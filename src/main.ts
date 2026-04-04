@@ -7,81 +7,100 @@ import { LevelIntroScene } from './scenes/LevelIntroScene';
 import { ArenaScene } from './scenes/ArenaScene';
 import { HighScoreScene } from './scenes/HighScoreScene';
 
-// Calculate game width from the actual container, not window
-// This avoids iOS safe-area and toolbar measurement issues
-function getContainerAspect(): number {
-  const container = document.getElementById('game-container');
-  if (container) {
-    const rect = container.getBoundingClientRect();
-    if (rect.width > 0 && rect.height > 0) {
-      return rect.width / rect.height;
-    }
+// Get the most reliable viewport dimensions available.
+// iOS Safari's getBoundingClientRect() is unreliable at startup —
+// it can return pre-layout (portrait) dimensions on a landscape screen.
+// The visualViewport API is the most accurate on iOS.
+function getViewportSize(): { width: number; height: number } {
+  if (window.visualViewport) {
+    return { width: window.visualViewport.width, height: window.visualViewport.height };
   }
-  return window.innerWidth / window.innerHeight;
+  // document.documentElement.clientWidth excludes scrollbar, more reliable than innerWidth
+  return {
+    width: document.documentElement.clientWidth || window.innerWidth,
+    height: document.documentElement.clientHeight || window.innerHeight,
+  };
 }
 
-const aspect = getContainerAspect();
-const gameWidth = Math.round(GAME_HEIGHT * aspect);
+function getAspect(): number {
+  const { width, height } = getViewportSize();
+  if (width > 0 && height > 0) return width / height;
+  return 16 / 9; // safe fallback
+}
 
-// Update the mutable runtime width so all systems use the correct value
-runtime.GAME_WIDTH = gameWidth;
+function initGame() {
+  const aspect = getAspect();
+  const gameWidth = Math.round(GAME_HEIGHT * aspect);
+  runtime.GAME_WIDTH = gameWidth;
 
-const config: Phaser.Types.Core.GameConfig = {
-  type: Phaser.AUTO,
-  width: gameWidth,
-  height: GAME_HEIGHT,
-  backgroundColor: '#0a1220',
-  parent: 'game-container',
-  physics: {
-    default: 'arcade',
-    arcade: {
-      gravity: { x: 0, y: 0 },
-      debug: false,
-    },
-  },
-  scene: [BootScene, TitleScene, CharacterSelectScene, LevelIntroScene, ArenaScene, HighScoreScene],
-  scale: {
-    mode: Phaser.Scale.FIT,
-    autoCenter: Phaser.Scale.CENTER_BOTH,
-    expandParent: false,
+  const config: Phaser.Types.Core.GameConfig = {
+    type: Phaser.AUTO,
     width: gameWidth,
     height: GAME_HEIGHT,
-  },
-  input: {
-    activePointers: 4,
-  },
-};
+    backgroundColor: '#0a1220',
+    parent: 'game-container',
+    physics: {
+      default: 'arcade',
+      arcade: {
+        gravity: { x: 0, y: 0 },
+        debug: false,
+      },
+    },
+    scene: [BootScene, TitleScene, CharacterSelectScene, LevelIntroScene, ArenaScene, HighScoreScene],
+    scale: {
+      mode: Phaser.Scale.FIT,
+      autoCenter: Phaser.Scale.CENTER_BOTH,
+      expandParent: false,
+      width: gameWidth,
+      height: GAME_HEIGHT,
+    },
+    input: {
+      activePointers: 4,
+    },
+  };
 
-const game = new Phaser.Game(config);
+  const game = new Phaser.Game(config);
 
-// On resize/orientation change, recalculate and resize the game
-function handleResize() {
-  const newAspect = getContainerAspect();
-  const newWidth = Math.round(GAME_HEIGHT * newAspect);
+  // On resize/orientation change, recalculate and resize the game
+  function handleResize() {
+    const newAspect = getAspect();
+    const newWidth = Math.round(GAME_HEIGHT * newAspect);
 
-  // Only resize if the aspect ratio actually changed meaningfully
-  if (Math.abs(newWidth - game.scale.width) > 10) {
-    runtime.GAME_WIDTH = newWidth;
-    game.scale.resize(newWidth, GAME_HEIGHT);
+    if (Math.abs(newWidth - game.scale.width) > 2) {
+      runtime.GAME_WIDTH = newWidth;
+      game.scale.resize(newWidth, GAME_HEIGHT);
+    }
+    game.scale.refresh();
   }
-  game.scale.refresh();
+
+  // Debounce resize to avoid thrashing during iOS toolbar animation
+  let resizeTimer: ReturnType<typeof setTimeout>;
+  function debouncedResize() {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(handleResize, 150);
+  }
+
+  window.addEventListener('resize', debouncedResize);
+  window.addEventListener('orientationchange', () => {
+    // iOS needs extra delay after orientation change for viewport to settle
+    setTimeout(handleResize, 300);
+    setTimeout(handleResize, 600);
+  });
+
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener('resize', debouncedResize);
+  }
+
+  // iOS safety net: re-check dimensions shortly after init in case the
+  // viewport wasn't settled when we first measured.
+  setTimeout(handleResize, 100);
+  setTimeout(handleResize, 500);
 }
 
-// Debounce resize to avoid thrashing during iOS toolbar animation
-let resizeTimer: ReturnType<typeof setTimeout>;
-function debouncedResize() {
-  clearTimeout(resizeTimer);
-  resizeTimer = setTimeout(handleResize, 300);
-}
-
-window.addEventListener('resize', debouncedResize);
-window.addEventListener('orientationchange', () => {
-  // iOS needs extra delay after orientation change for viewport to settle
-  setTimeout(handleResize, 300);
-  setTimeout(handleResize, 600);
-});
-
-// Also handle iOS visual viewport resize (handles toolbar show/hide)
-if (window.visualViewport) {
-  window.visualViewport.addEventListener('resize', debouncedResize);
+// Wait for DOM to be ready before measuring viewport — iOS Safari reports
+// wrong dimensions if we measure before layout is complete.
+if (document.readyState === 'complete') {
+  initGame();
+} else {
+  window.addEventListener('load', initGame);
 }
