@@ -177,6 +177,10 @@ export function updateArena(
         state.sound.enemyShoot();
       }
     }
+    // Also force-fire every 300ms regardless of AI decision
+    if (now - enemy.lastFireTime > 300) {
+      tryFireWeapon(enemy, boltPool, now);
+    }
     // AI directly controls enemy position — skip physics
   }
 

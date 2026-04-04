@@ -23,7 +23,7 @@ export const DIFFICULTY: Record<DifficultyLevel, DifficultyConfig> = {
     enemyShield: 0,
     enemySpeedMult: 0.3,
     enemyRotationMult: 0.3,
-    enemyFireRate: 800,
+    enemyFireRate: 400,
     enemyChaseRange: 350,
   },
   intermediate: {
@@ -34,7 +34,7 @@ export const DIFFICULTY: Record<DifficultyLevel, DifficultyConfig> = {
     enemyShield: 0,
     enemySpeedMult: 0.5,
     enemyRotationMult: 0.5,
-    enemyFireRate: 500,
+    enemyFireRate: 250,
     enemyChaseRange: 500,
   },
   expert: {
@@ -45,7 +45,7 @@ export const DIFFICULTY: Record<DifficultyLevel, DifficultyConfig> = {
     enemyShield: 30,
     enemySpeedMult: 0.8,
     enemyRotationMult: 0.8,
-    enemyFireRate: 300,
+    enemyFireRate: 150,
     enemyChaseRange: 700,
   },
 };
