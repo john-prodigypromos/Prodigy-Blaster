@@ -5,10 +5,11 @@ export const GAME_HEIGHT = 720;
 /** Mutable game width — updated at startup based on screen aspect ratio */
 export const runtime = { GAME_WIDTH: 1280 };
 
-/** Get live game dimensions from a Phaser scene (preferred over GAME_WIDTH/GAME_HEIGHT) */
-export function getGameSize(scene: { scale: { width: number; height: number } }): { w: number; h: number } {
-  return { w: scene.scale.width || runtime.GAME_WIDTH, h: scene.scale.height || GAME_HEIGHT };
-}
+// ── 3D Arena ──
+export const ARENA = {
+  RADIUS: 500,            // sphere boundary radius
+  BOUNDARY_WARN: 450,     // distance at which HUD warns player
+} as const;
 
 export const PHYSICS = {
   FIXED_TIMESTEP: 1000 / 60,
