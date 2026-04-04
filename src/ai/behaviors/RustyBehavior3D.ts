@@ -21,8 +21,8 @@ export class RustyBehavior3D implements AIBehavior3D {
   ) {
     this.fireRate = fireRate;
     this.swayTimer = Math.random() * Math.PI * 2;
-    this.swaySpeedX = 0.7 + Math.random() * 0.4;
-    this.swaySpeedY = 0.5 + Math.random() * 0.3;
+    this.swaySpeedX = 1.2 + Math.random() * 0.6;
+    this.swaySpeedY = 0.8 + Math.random() * 0.4;
   }
 
   update(self: Ship3D, target: Ship3D, dt: number, now: number): ShipInput & { fire: boolean } {
@@ -34,9 +34,9 @@ export class RustyBehavior3D implements AIBehavior3D {
 
     // Position: always 15 units ahead of where the player is looking
     const playerForward = target.getForward();
-    const desiredX = target.position.x + playerForward.x * 15 + Math.sin(this.swayTimer * this.swaySpeedX) * 6;
-    const desiredY = target.position.y + playerForward.y * 15 + Math.sin(this.swayTimer * this.swaySpeedY) * 3;
-    const desiredZ = target.position.z + playerForward.z * 15 + Math.cos(this.swayTimer * this.swaySpeedX) * 6;
+    const desiredX = target.position.x + playerForward.x * 15 + Math.sin(this.swayTimer * this.swaySpeedX) * 10;
+    const desiredY = target.position.y + playerForward.y * 15 + Math.sin(this.swayTimer * this.swaySpeedY) * 5;
+    const desiredZ = target.position.z + playerForward.z * 15 + Math.cos(this.swayTimer * this.swaySpeedX) * 10;
 
     // Snap to position
     const lerpRate = Math.min(1, dt * 4);
