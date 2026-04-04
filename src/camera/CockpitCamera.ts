@@ -13,8 +13,8 @@ export class CockpitCamera {
   private shakeIntensity = 0;
   private shakeDecay = 5; // per second
 
-  // Camera inside cockpit — slightly above center, looking forward along +Z
-  private offset = new THREE.Vector3(0, 0.6, 2.5);
+  // Camera in cockpit — high enough to see nose below, far enough back to see wings
+  private offset = new THREE.Vector3(0, 1.2, 0.5);
 
   // Temp vectors to avoid GC
   private _worldPos = new THREE.Vector3();

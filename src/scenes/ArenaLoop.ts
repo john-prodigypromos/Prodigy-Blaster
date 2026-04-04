@@ -59,8 +59,10 @@ export function createArenaState(
   });
   player.score = previousScore;
 
-  // Hide player ship from cockpit view (camera is inside it)
-  playerGeo.visible = false;
+  // Hide only the cockpit dome (camera sits inside it), keep rest visible
+  playerGeo.traverse((child) => {
+    if (child.name === 'cockpit') child.visible = false;
+  });
 
   // ── Enemies ──
   const levelConfig = getCurrentLevel();

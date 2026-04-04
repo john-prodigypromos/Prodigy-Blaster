@@ -15,7 +15,7 @@ function seededRng(seed: number) {
 }
 
 export function createStarfield(scene: THREE.Scene): THREE.Points {
-  const COUNT = 2000;
+  const COUNT = 800;
   const SPREAD = 4000;
   const rng = seededRng(42);
 
@@ -52,7 +52,7 @@ export function createStarfield(scene: THREE.Scene): THREE.Points {
     }
 
     // Vary brightness via size — most dim, some bright
-    sizes[i] = i < 1800 ? 0.8 + rng() * 1.2 : 2.0 + rng() * 3.5;
+    sizes[i] = i < 700 ? 0.8 + rng() * 1.2 : 2.0 + rng() * 3.5;
   }
 
   const geo = new THREE.BufferGeometry();
