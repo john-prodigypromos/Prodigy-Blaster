@@ -135,10 +135,9 @@ function showTitleOverlay(): void {
   title.style.cssText = 'font-size:48px;font-weight:bold;letter-spacing:4px;margin-bottom:8px;';
   panel.appendChild(title);
 
-  const sub = document.createElement('div');
-  sub.textContent = 'オー・ヤム ブラスター';
-  sub.style.cssText = 'font-size:24px;color:#aaa;margin-bottom:40px;';
-  panel.appendChild(sub);
+  const spacer = document.createElement('div');
+  spacer.style.cssText = 'margin-bottom:40px;';
+  panel.appendChild(spacer);
 
   const selectLabel = document.createElement('div');
   selectLabel.textContent = 'SELECT DIFFICULTY';

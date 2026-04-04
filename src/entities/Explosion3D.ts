@@ -71,12 +71,26 @@ export class ExplosionPool {
 
     slot.active = true;
     slot.elapsed = 0;
-    slot.duration = 2.0 + Math.random() * 1.0; // 2-3 seconds
+    slot.duration = 2.5;
     slot.worldPos.copy(position);
+
+    // Project to screen immediately to set initial position
+    if (this.camera) {
+      const w = window.innerWidth;
+      const h = window.innerHeight;
+      const projected = position.clone().project(this.camera);
+      const sx = (projected.x * 0.5 + 0.5) * w;
+      const sy = (-projected.y * 0.5 + 0.5) * h;
+      slot.el.style.left = sx + 'px';
+      slot.el.style.top = sy + 'px';
+    }
 
     slot.el.style.width = size + 'px';
     slot.el.style.height = size + 'px';
     slot.el.style.display = 'block';
+    // Reset animation by removing and re-adding
+    slot.el.style.animation = 'none';
+    slot.el.offsetHeight; // force reflow
     slot.el.style.animation = `explode ${slot.duration}s ease-out forwards`;
   }
 

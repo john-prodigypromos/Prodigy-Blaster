@@ -207,22 +207,21 @@ export function updateArena(
       else state.sound.hullHit();
     }
 
-    // Visible impact flash at hit point
-    explosions.spawn(evt.bolt.mesh.position.clone(), 40);
+    // Impact flash at enemy position
+    if (!evt.target.isPlayer) {
+      explosions.spawn(evt.target.position.clone(), 60);
+    }
 
-    // Big explosion on death — staggered multi-burst for dramatic effect
+    // DEATH: giant fireball centered on enemy
     if (!evt.target.alive) {
       const pos = evt.target.position.clone();
-      // Massive death explosion — multiple overlapping bursts
+      explosions.spawn(pos, 300);
+      explosions.spawn(pos, 250);
       explosions.spawn(pos, 200);
-      explosions.spawn(pos.clone().add(new THREE.Vector3(4, 3, -2)), 150);
-      explosions.spawn(pos.clone().add(new THREE.Vector3(-3, -2, 3)), 120);
-      explosions.spawn(pos.clone().add(new THREE.Vector3(2, -1, -3)), 160);
       state.sound.explosion();
       if (!evt.target.isPlayer) {
         state.score += 500;
-        // Delay hiding the ship so it's visible during explosion
-        setTimeout(() => { evt.target.group.visible = false; }, 500);
+        setTimeout(() => { evt.target.group.visible = false; }, 800);
       }
     }
   }
