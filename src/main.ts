@@ -11,6 +11,8 @@ import { CockpitCamera } from './camera/CockpitCamera';
 import { applyShipPhysics, checkShipCollision, resolveShipCollision, type ShipInput } from './systems/PhysicsSystem3D';
 import { BoltPool } from './entities/Bolt3D';
 import { tryFireWeapon } from './systems/WeaponSystem3D';
+import { processBoltDamage } from './systems/DamageSystem3D';
+import { ExplosionPool } from './entities/Explosion3D';
 import { SHIP } from './config';
 
 // ── Globals ──
@@ -21,6 +23,7 @@ let player: Ship3D;
 let enemy: Ship3D;
 let cockpitCam: CockpitCamera;
 let boltPool: BoltPool;
+let explosions: ExplosionPool;
 
 // Input state
 const keys: Record<string, boolean> = {};
@@ -66,8 +69,9 @@ function init() {
   const crosshair = document.getElementById('crosshair');
   if (crosshair) crosshair.style.display = 'block';
 
-  // ── Bolt pool ──
+  // ── Bolt pool + explosions ──
   boltPool = new BoltPool(bundle.scene);
+  explosions = new ExplosionPool(bundle.scene);
 
   // ── Input ──
   window.addEventListener('keydown', (e) => { keys[e.code] = true; });
@@ -107,11 +111,29 @@ function animate() {
   }
   boltPool.update(dt);
 
+  // ── Bolt-to-ship damage ──
+  const damageEvents = processBoltDamage(boltPool, [player, enemy], now);
+  for (const evt of damageEvents) {
+    if (evt.target === player) {
+      cockpitCam.shake(evt.shieldHit ? 0.3 : 0.6);
+    }
+    // Trigger explosion at bolt impact point
+    explosions.spawn(evt.bolt.mesh.position.clone());
+
+    // If ship died, big explosion at ship position
+    if (!evt.target.alive) {
+      explosions.spawn(evt.target.position.clone());
+    }
+  }
+
   // ── Ship-to-ship collision ──
   if (checkShipCollision(player, enemy, SHIP.HITBOX_RADIUS)) {
     resolveShipCollision(player, enemy, SHIP.HITBOX_RADIUS, now);
     cockpitCam.shake(0.5);
   }
+
+  // ── Explosions ──
+  explosions.update(dt);
 
   // ── Camera ──
   cockpitCam.update(player, dt, input.yaw);
