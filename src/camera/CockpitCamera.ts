@@ -13,8 +13,8 @@ export class CockpitCamera {
   private shakeIntensity = 0;
   private shakeDecay = 5; // per second
 
-  // Camera offset from ship center (local space)
-  private offset = new THREE.Vector3(0, 1.5, -3);
+  // Camera inside cockpit — slightly above center, looking forward along +Z
+  private offset = new THREE.Vector3(0, 0.6, 2.5);
 
   // Temp vectors to avoid GC
   private _worldPos = new THREE.Vector3();

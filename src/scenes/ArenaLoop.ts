@@ -59,6 +59,9 @@ export function createArenaState(
   });
   player.score = previousScore;
 
+  // Hide player ship from cockpit view (camera is inside it)
+  playerGeo.visible = false;
+
   // ── Enemies ──
   const levelConfig = getCurrentLevel();
   const enemies: Ship3D[] = [];
@@ -68,13 +71,13 @@ export function createArenaState(
     const enemyGeo = createEnemyShipGeometry();
     applyMaterials(enemyGeo, createEnemyMaterials());
 
-    // Spawn around player, spread out
-    const angle = (i / levelConfig.enemyCount) * Math.PI * 2;
-    const dist = 150 + Math.random() * 100;
+    // Spawn in front of player, close enough to see
+    const angle = (i / levelConfig.enemyCount) * Math.PI * 0.6 - Math.PI * 0.3;
+    const dist = 60 + Math.random() * 40;
     enemyGeo.position.set(
-      Math.cos(angle) * dist,
-      (Math.random() - 0.5) * 50,
       Math.sin(angle) * dist,
+      (Math.random() - 0.5) * 20,
+      Math.cos(angle) * dist, // +Z = forward (ship faces +Z)
     );
     scene.add(enemyGeo);
 
