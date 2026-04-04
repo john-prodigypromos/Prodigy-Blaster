@@ -304,16 +304,6 @@ function startArena(): void {
   hud = new HUD3D();
   crosshairEl.style.display = 'block';
 
-  // Test: spawn a guaranteed center-screen explosion after 2 seconds
-  setTimeout(() => {
-    if (arena) {
-      const testDiv = document.createElement('div');
-      testDiv.className = 'explosion-fx';
-      testDiv.style.cssText = 'position:fixed;left:50%;top:50%;width:200px;height:200px;z-index:9999;display:block;';
-      testDiv.style.animation = 'explode 2s ease-out forwards';
-      document.getElementById('ui-overlay')!.appendChild(testDiv);
-    }
-  }, 2000);
 }
 
 function showHighScoreOverlay(): void {

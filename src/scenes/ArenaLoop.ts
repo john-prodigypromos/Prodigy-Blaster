@@ -212,16 +212,13 @@ export function updateArena(
       explosions.spawn(evt.target.position.clone(), 60);
     }
 
-    // DEATH: giant fireball centered on enemy
+    // DEATH: spectacular chain explosion
     if (!evt.target.alive) {
-      const pos = evt.target.position.clone();
-      explosions.spawn(pos, 300);
-      explosions.spawn(pos, 250);
-      explosions.spawn(pos, 200);
+      explosions.spawnDeathExplosion(evt.target.position.clone());
       state.sound.explosion();
       if (!evt.target.isPlayer) {
         state.score += 500;
-        setTimeout(() => { evt.target.group.visible = false; }, 800);
+        setTimeout(() => { evt.target.group.visible = false; }, 1500);
       }
     }
   }
