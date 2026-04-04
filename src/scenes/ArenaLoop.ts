@@ -71,7 +71,7 @@ export function createArenaState(
 
   for (let i = 0; i < levelConfig.enemyCount; i++) {
     const enemyGeo = createEnemyShipGeometry();
-    enemyGeo.scale.set(2, 2, 2); // double size for visibility
+    enemyGeo.scale.set(3, 3, 3); // triple size for maximum visibility
     applyMaterials(enemyGeo, createEnemyMaterials());
 
     // Spawn directly ahead of player — impossible to miss

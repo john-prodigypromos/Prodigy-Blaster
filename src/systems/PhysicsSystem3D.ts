@@ -23,18 +23,16 @@ export function applyShipPhysics(ship: Ship3D, input: ShipInput, dt: number, now
 
   const rotSpeed = PHYSICS.ROTATION_SPEED * ship.rotationMult;
 
-  // ── Rotation (local-space axes) ──
+  // ── Rotation ──
+  // Yaw around WORLD Y-axis (prevents roll accumulation)
   if (input.yaw !== 0) {
     _quat.setFromAxisAngle(_yawAxis, -input.yaw * rotSpeed * dt);
-    ship.group.quaternion.multiply(_quat);
+    ship.group.quaternion.premultiply(_quat); // premultiply = world space
   }
+  // Pitch around LOCAL X-axis
   if (input.pitch !== 0) {
     _quat.setFromAxisAngle(_pitchAxis, input.pitch * rotSpeed * 0.7 * dt);
-    ship.group.quaternion.multiply(_quat);
-  }
-  if (input.roll !== 0) {
-    _quat.setFromAxisAngle(_rollAxis, input.roll * rotSpeed * 0.5 * dt);
-    ship.group.quaternion.multiply(_quat);
+    ship.group.quaternion.multiply(_quat); // multiply = local space
   }
 
   ship.group.quaternion.normalize();

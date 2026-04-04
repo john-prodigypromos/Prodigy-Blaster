@@ -3,6 +3,7 @@
 // Shield bar, hull bar, score, targets, level indicator.
 // All content is static/hardcoded — no user input rendered as HTML.
 
+import * as THREE from 'three';
 import { Ship3D } from '../entities/Ship3D';
 
 function el(tag: string, attrs: Record<string, string> = {}, text?: string): HTMLElement {
@@ -104,7 +105,7 @@ export class HUD3D {
     overlay.appendChild(this.container);
   }
 
-  update(player: Ship3D, enemies: Ship3D[], score: number, level: number): void {
+  update(player: Ship3D, enemies: Ship3D[], score: number, level: number, camera?: THREE.PerspectiveCamera): void {
     this.shieldBar.style.width = `${player.shieldPct * 100}%`;
     this.hullBar.style.width = `${(1 - player.damagePct) * 100}%`;
 
@@ -122,6 +123,86 @@ export class HUD3D {
     const total = enemies.length;
     this.targetsEl.textContent = `${total - alive}/${total}`;
     this.levelEl.textContent = String(level);
+
+    // ── Target indicators — show arrow + distance for each enemy ──
+    this.updateTargetIndicators(enemies, camera);
+  }
+
+  private targetMarkers: HTMLDivElement[] = [];
+
+  private updateTargetIndicators(enemies: Ship3D[], camera?: THREE.PerspectiveCamera): void {
+    // Remove old markers
+    for (const m of this.targetMarkers) m.remove();
+    this.targetMarkers = [];
+
+    if (!camera) return;
+
+    const w = window.innerWidth;
+    const h = window.innerHeight;
+
+    for (const enemy of enemies) {
+      if (!enemy.alive) continue;
+
+      // Project enemy position to screen
+      const pos = enemy.position.clone().project(camera);
+
+      // pos.x/y are in NDC (-1 to 1), convert to pixels
+      const sx = (pos.x * 0.5 + 0.5) * w;
+      const sy = (-pos.y * 0.5 + 0.5) * h;
+      const behind = pos.z > 1; // behind camera
+
+      const marker = document.createElement('div');
+      marker.style.cssText = 'position:fixed;pointer-events:none;z-index:22;text-align:center;';
+
+      const dist = enemy.position.distanceTo(camera.position);
+      const distText = Math.round(dist) + 'm';
+
+      if (!behind && sx > 20 && sx < w - 20 && sy > 20 && sy < h - 20) {
+        // On screen — show bracket around enemy
+        marker.style.left = sx - 30 + 'px';
+        marker.style.top = sy - 30 + 'px';
+        marker.style.width = '60px';
+        marker.style.height = '60px';
+        marker.style.border = '2px solid #ff4444';
+        marker.style.borderRadius = '4px';
+
+        const label = document.createElement('div');
+        label.textContent = distText;
+        label.style.cssText = 'position:absolute;bottom:-18px;left:50%;transform:translateX(-50%);font-size:11px;color:#ff4444;font-family:Arial;white-space:nowrap;';
+        marker.appendChild(label);
+      } else {
+        // Off screen or behind — show arrow at edge pointing toward enemy
+        let edgeX = Math.max(40, Math.min(w - 40, sx));
+        let edgeY = Math.max(40, Math.min(h - 40, sy));
+        if (behind) {
+          edgeX = w - edgeX; // flip if behind
+          edgeY = h - edgeY;
+        }
+        edgeX = Math.max(40, Math.min(w - 40, edgeX));
+        edgeY = Math.max(40, Math.min(h - 40, edgeY));
+
+        marker.style.left = edgeX - 12 + 'px';
+        marker.style.top = edgeY - 12 + 'px';
+        marker.style.width = '24px';
+        marker.style.height = '24px';
+        marker.style.fontSize = '20px';
+        marker.style.color = '#ff4444';
+        marker.style.lineHeight = '24px';
+
+        // Arrow pointing toward enemy
+        const angle = Math.atan2(sy - h / 2, sx - w / 2);
+        marker.textContent = '\u25C6'; // diamond
+        marker.style.transform = `rotate(${angle}rad)`;
+
+        const label = document.createElement('div');
+        label.textContent = distText;
+        label.style.cssText = 'position:absolute;top:26px;left:50%;transform:translateX(-50%);font-size:10px;color:#ff4444;font-family:Arial;white-space:nowrap;';
+        marker.appendChild(label);
+      }
+
+      this.container.appendChild(marker);
+      this.targetMarkers.push(marker);
+    }
   }
 
   show(): void { this.container.style.display = 'block'; }

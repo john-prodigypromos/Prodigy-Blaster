@@ -466,7 +466,7 @@ function animate() {
 
     // Update HUD
     if (hud) {
-      hud.update(arena.player, arena.enemies, arena.score, currentLevelIndex + 1);
+      hud.update(arena.player, arena.enemies, arena.score, currentLevelIndex + 1, bundle.camera);
     }
 
     // Check win/lose
