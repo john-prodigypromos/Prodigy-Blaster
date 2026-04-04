@@ -13,6 +13,7 @@ import { BoltPool } from './entities/Bolt3D';
 import { tryFireWeapon } from './systems/WeaponSystem3D';
 import { processBoltDamage } from './systems/DamageSystem3D';
 import { ExplosionPool } from './entities/Explosion3D';
+import { RustyBehavior3D } from './ai/behaviors/RustyBehavior3D';
 import { SHIP } from './config';
 
 // ── Globals ──
@@ -24,6 +25,7 @@ let enemy: Ship3D;
 let cockpitCam: CockpitCamera;
 let boltPool: BoltPool;
 let explosions: ExplosionPool;
+let enemyAI: RustyBehavior3D;
 
 // Input state
 const keys: Record<string, boolean> = {};
@@ -69,9 +71,10 @@ function init() {
   const crosshair = document.getElementById('crosshair');
   if (crosshair) crosshair.style.display = 'block';
 
-  // ── Bolt pool + explosions ──
+  // ── Bolt pool + explosions + AI ──
   boltPool = new BoltPool(bundle.scene);
   explosions = new ExplosionPool(bundle.scene);
+  enemyAI = new RustyBehavior3D();
 
   // ── Input ──
   window.addEventListener('keydown', (e) => { keys[e.code] = true; });
@@ -101,9 +104,15 @@ function animate() {
     thrust: (keys['ArrowUp'] || keys['KeyW'] ? 1 : 0) + (keys['ArrowDown'] || keys['KeyS'] ? -1 : 0),
   };
 
+  // ── Enemy AI ──
+  const aiInput = enemyAI.update(enemy, player, dt, now);
+  if (aiInput.fire) {
+    tryFireWeapon(enemy, boltPool, now);
+  }
+
   // ── Physics ──
   applyShipPhysics(player, input, dt, now);
-  applyShipPhysics(enemy, { yaw: 0, pitch: 0, roll: 0, thrust: 0 }, dt, now);
+  applyShipPhysics(enemy, aiInput, dt, now);
 
   // ── Weapons ──
   if (keys['Space']) {
