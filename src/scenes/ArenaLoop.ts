@@ -214,18 +214,28 @@ export function updateArena(
         else state.sound.hullHit();
       }
 
-      // Explosion at screen center (simple, reliable)
-      const cx = window.innerWidth / 2;
-      const cy = window.innerHeight / 2;
+      // Project enemy position to screen for explosions
+      const w = window.innerWidth;
+      const h = window.innerHeight;
+      let ex = w / 2;
+      let ey = h / 2;
 
-      // Impact flash on every hit
       if (!evt.target.isPlayer) {
-        explosions.spawnHit(cx, cy);
+        const proj = evt.target.position.clone().project(state.camera);
+        if (proj.z < 1) {
+          ex = (proj.x * 0.5 + 0.5) * w;
+          ey = (-proj.y * 0.5 + 0.5) * h;
+        }
       }
 
-      // DEATH
+      // Impact flash at enemy position
+      if (!evt.target.isPlayer) {
+        explosions.spawnHit(ex, ey);
+      }
+
+      // DEATH — explosion at enemy position
       if (!evt.target.alive) {
-        explosions.spawnDeath(cx, cy);
+        explosions.spawnDeath(ex, ey);
         state.sound.explosion();
         if (!evt.target.isPlayer) {
           state.score += 500;
