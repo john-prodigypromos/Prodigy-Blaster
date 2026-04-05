@@ -39,7 +39,7 @@ export class HUD3D {
       .hud-bar-label { font-size:10px;color:#aaa;text-transform:uppercase;letter-spacing:1px;margin-bottom:2px; }
       .hud-shield-fill { background:linear-gradient(90deg,#006688,#00ccff); }
       .hud-hull-fill { background:linear-gradient(90deg,#226622,#44ff44); }
-      .hud-top-center { position:absolute;top:12px;left:50%;transform:translateX(-50%);font-size:14px;font-weight:bold;color:rgba(255,255,255,0.4);letter-spacing:3px; }
+      .hud-top-center { position:absolute;top:12px;left:50%;transform:translateX(-50%);font-size:14px;font-weight:700;color:rgba(255,255,255,0.4);letter-spacing:4px;font-family:Orbitron,sans-serif; }
       .hud-bottom-left { position:absolute;bottom:16px;left:16px;font-size:14px;color:#fff; }
       .hud-score { font-size:18px;font-weight:bold;color:#ffcc00; }
       .hud-targets { font-size:13px;color:#aaa;margin-top:4px; }

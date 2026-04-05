@@ -132,7 +132,7 @@ function showTitleOverlay(): void {
 
   const title = document.createElement('div');
   title.textContent = 'OH-YUM BLASTER';
-  title.style.cssText = 'font-size:clamp(24px,6vw,48px);font-weight:bold;letter-spacing:4px;margin-bottom:8px;text-align:center;';
+  title.style.cssText = 'font-size:clamp(28px,7vw,56px);font-weight:900;letter-spacing:6px;margin-bottom:12px;text-align:center;font-family:Orbitron,sans-serif;text-shadow:0 0 30px rgba(0,200,255,0.3),0 0 60px rgba(0,100,255,0.15);';
   panel.appendChild(title);
 
   const spacer = document.createElement('div');
