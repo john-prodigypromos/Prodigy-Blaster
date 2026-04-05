@@ -28,6 +28,14 @@ export function tryFireWeapon(
   if (now - ship.lastFireTime < rate) return false;
   ship.lastFireTime = now;
 
+  // Enemy ships can only fire from the front — check if target is in forward cone
+  if (!ship.isPlayer && target && target.alive) {
+    const toTarget = target.position.clone().sub(ship.position).normalize();
+    const forward = ship.getForward();
+    const dot = forward.dot(toTarget);
+    if (dot < 0.3) return false; // target is behind or far to the side (~72 degree half-cone)
+  }
+
   const offsets = ship.isPlayer ? PLAYER_BOLT_OFFSETS : [ENEMY_BOLT_OFFSET];
 
   for (const localOffset of offsets) {

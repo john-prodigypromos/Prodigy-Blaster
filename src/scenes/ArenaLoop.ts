@@ -198,44 +198,39 @@ export function updateArena(
   const damageEvents = processBoltDamage(boltPool, allShips, now);
 
   for (const evt of damageEvents) {
-    // Score for player hitting enemies
-    if (evt.bolt.isPlayer && !evt.target.isPlayer) {
-      state.score += evt.damage * 10;
-    }
-
-    // Sound + camera shake on player hit
-    if (evt.target === player) {
-      cockpitCam.shake(evt.shieldHit ? 0.3 : 0.6);
-      if (evt.shieldHit) state.sound.shieldHit();
-      else state.sound.hullHit();
-    }
-
-    // Project target position to screen for explosions
-    const w = window.innerWidth;
-    const h = window.innerHeight;
-    const projected = evt.target.position.clone().project(state.camera);
-    const sx = (projected.x * 0.5 + 0.5) * w;
-    const sy = (-projected.y * 0.5 + 0.5) * h;
-    const onScreen = projected.z < 1 && sx > 0 && sx < w && sy > 0 && sy < h;
-
-    // Impact flash at enemy position
-    if (!evt.target.isPlayer && onScreen) {
-      explosions.spawnHit(sx, sy);
-    }
-
-    // DEATH: spectacular chain explosion
-    if (!evt.target.alive) {
-      if (onScreen) {
-        explosions.spawnDeath(sx, sy);
-      } else {
-        // Off-screen death — show at screen center
-        explosions.spawnDeath(w / 2, h / 2);
+    try {
+      // Score for player hitting enemies
+      if (evt.bolt.isPlayer && !evt.target.isPlayer) {
+        state.score += evt.damage * 10;
       }
-      state.sound.explosion();
+
+      // Sound + camera shake on player hit
+      if (evt.target === player) {
+        cockpitCam.shake(evt.shieldHit ? 0.3 : 0.6);
+        if (evt.shieldHit) state.sound.shieldHit();
+        else state.sound.hullHit();
+      }
+
+      // Explosion at screen center (simple, reliable)
+      const cx = window.innerWidth / 2;
+      const cy = window.innerHeight / 2;
+
+      // Impact flash on every hit
       if (!evt.target.isPlayer) {
-        state.score += 500;
-        setTimeout(() => { evt.target.group.visible = false; }, 1500);
+        explosions.spawnHit(cx, cy);
       }
+
+      // DEATH
+      if (!evt.target.alive) {
+        explosions.spawnDeath(cx, cy);
+        state.sound.explosion();
+        if (!evt.target.isPlayer) {
+          state.score += 500;
+          evt.target.group.visible = false;
+        }
+      }
+    } catch (e) {
+      console.error('Damage event error:', e);
     }
   }
 
