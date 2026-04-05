@@ -135,6 +135,7 @@ export function updateArena(
   dt: number,
   now: number,
 ): void {
+  try {
   if (state.gameOver || state.victory) return;
 
   const { player, enemies, enemyAIs, boltPool, explosions, cockpitCam, touchControls, mouseControls } = state;
@@ -264,6 +265,9 @@ export function updateArena(
     state.victoryTime = now;
     state.sound.stopMusic();
     state.sound.victory();
+  }
+  } catch (e) {
+    console.error('Arena update error:', e);
   }
 }
 
