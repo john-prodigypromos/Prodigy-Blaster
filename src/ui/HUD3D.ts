@@ -5,6 +5,7 @@
 
 import * as THREE from 'three';
 import { Ship3D } from '../entities/Ship3D';
+import { currentCharacter } from '../state/Character';
 
 function el(tag: string, attrs: Record<string, string> = {}, text?: string): HTMLElement {
   const e = document.createElement(tag);
@@ -66,6 +67,20 @@ export class HUD3D {
     this.hullBar.style.width = '100%';
     hullContainer.appendChild(this.hullBar);
     topLeft.appendChild(hullContainer);
+
+    // Pilot portrait
+    const pilotRow = document.createElement('div');
+    pilotRow.style.cssText = 'display:flex;align-items:center;gap:8px;margin-top:8px;';
+    const pilotImg = document.createElement('img');
+    pilotImg.src = `/portraits/${currentCharacter}.jpg`;
+    pilotImg.alt = currentCharacter;
+    pilotImg.style.cssText = 'width:36px;height:36px;border-radius:50%;object-fit:cover;border:2px solid #88aacc;';
+    pilotRow.appendChild(pilotImg);
+    const pilotName = document.createElement('div');
+    pilotName.textContent = currentCharacter.toUpperCase();
+    pilotName.style.cssText = 'font-size:12px;font-weight:bold;color:#88aacc;letter-spacing:1px;';
+    pilotRow.appendChild(pilotName);
+    topLeft.appendChild(pilotRow);
 
     this.container.appendChild(topLeft);
 
