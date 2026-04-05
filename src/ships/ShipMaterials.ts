@@ -30,12 +30,12 @@ export function createPlayerMaterials(characterColor?: number): ShipMaterialSet 
 
   const hull = new THREE.MeshPhysicalMaterial({
     color: baseColor,
-    metalness: 0.95,
-    roughness: 0.3,
+    metalness: 0.6,
+    roughness: 0.6,
     normalMap: normalMap,
     roughnessMap: roughnessMap,
-    clearcoat: 0.5,
-    clearcoatRoughness: 0.1,
+    clearcoat: 0.1,
+    clearcoatRoughness: 0.4,
   });
 
   const cockpit = new THREE.MeshPhysicalMaterial({

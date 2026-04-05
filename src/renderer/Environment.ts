@@ -152,8 +152,8 @@ export function createLighting(scene: THREE.Scene): {
   const hemisphere = new THREE.HemisphereLight(0x222244, 0x000000, 0.2);
   scene.add(hemisphere);
 
-  // Sun — main directional (warm white, dramatic)
-  const sun = new THREE.DirectionalLight(0xfff5e6, 3.0);
+  // Sun — soft directional (not too bright for metallic ships)
+  const sun = new THREE.DirectionalLight(0xfff5e6, 0.8);
   sun.position.set(200, 150, 100);
   scene.add(sun);
 

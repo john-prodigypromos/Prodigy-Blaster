@@ -32,7 +32,7 @@ export function createRenderer(canvas: HTMLCanvasElement): RendererBundle {
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.setSize(w, h);
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.2;
+  renderer.toneMappingExposure = 0.8;
   renderer.outputColorSpace = THREE.SRGBColorSpace;
 
   // ── Scene ──
@@ -53,9 +53,9 @@ export function createRenderer(canvas: HTMLCanvasElement): RendererBundle {
     : new THREE.Vector2(w, h);
   const bloomPass = new UnrealBloomPass(
     bloomRes,
-    1.5,  // strength — engine glows, bolt glow, explosion flash
-    0.6,  // radius — soft falloff
-    0.85, // threshold — only bright emissives bloom
+    0.6,  // strength — subtle glow, no blowout
+    0.4,  // radius
+    0.95, // threshold — only very bright emissives bloom
   );
   composer.addPass(bloomPass);
 
