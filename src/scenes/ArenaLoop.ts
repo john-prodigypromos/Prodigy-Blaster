@@ -89,6 +89,8 @@ export function createArenaState(
       elevation,
       Math.sin(angle) * dist,
     );
+    // Face toward the player (origin) from spawn — head-on approach
+    enemyGeo.lookAt(0, 0, 0);
     scene.add(enemyGeo);
 
     const enemy = new Ship3D({

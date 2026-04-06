@@ -16,7 +16,7 @@ type Phase = 'roam' | 'approach' | 'attack' | 'retreat';
 export class RustyBehavior3D implements AIBehavior3D {
   private fireRate: number;
   private timer = 0;
-  private phase: Phase = 'roam';
+  private phase: Phase = 'approach'; // start heading straight at the player
   private phaseTimer = 0;
   private idx: number;
   private roamTarget = new THREE.Vector3();
@@ -80,13 +80,21 @@ export class RustyBehavior3D implements AIBehavior3D {
         break;
 
       case 'approach': {
-        // Sweep toward the player's flanks to set up a blind-spot attack run
-        const approachFwd = target.getForward();
-        const flanking = new THREE.Vector3(-approachFwd.z, 0, approachFwd.x); // perpendicular
-        const side = (this.idx % 2 === 0) ? 1 : -1; // alternate left/right flanking
+        // Head-on approach with aggressive evasive weaving — hard to hit
         desiredPos.copy(target.position);
-        desiredPos.addScaledVector(flanking, side * 20);
-        desiredPos.y += Math.sin(this.timer * 0.5 + this.idx) * 8;
+
+        // Weave laterally and vertically while closing distance
+        const weaveSpeed = 2.0 + this.idx * 0.5;
+        const weaveAmplitude = 30 + this.idx * 10; // wider weave per enemy
+        const lateralWeave = Math.sin(this.timer * weaveSpeed + this.idx * 2.1) * weaveAmplitude;
+        const verticalWeave = Math.cos(this.timer * weaveSpeed * 0.7 + this.idx * 1.3) * weaveAmplitude * 0.6;
+
+        // Perpendicular to the line between enemy and player
+        const toPlayer = target.position.clone().sub(self.position).normalize();
+        const right = new THREE.Vector3(-toPlayer.z, 0, toPlayer.x);
+
+        desiredPos.addScaledVector(right, lateralWeave);
+        desiredPos.y += verticalWeave;
         break;
       }
 
