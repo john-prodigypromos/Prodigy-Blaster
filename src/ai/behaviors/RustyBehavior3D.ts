@@ -1,7 +1,7 @@
 // ── Rusty AI Behavior (3D) ───────────────────────────────
-// Enemy roams around the arena, periodically swooping in to
-// attack the player then pulling away to a new position.
-// Player has to look around to find them.
+// Cinematic dogfight AI: enemies stay visible at mid-range,
+// cruise in your POV, and gradually close distance for
+// longer, more visual engagements. Think Top Gun, not ambush.
 
 import * as THREE from 'three';
 import { Ship3D } from '../../entities/Ship3D';
@@ -11,15 +11,15 @@ import type { ShipInput } from '../../systems/PhysicsSystem3D';
 
 let enemyIndex = 0;
 
-type Phase = 'roam' | 'approach' | 'attack' | 'retreat';
+type Phase = 'cruise' | 'closing' | 'dogfight' | 'breakaway';
 
 export class RustyBehavior3D implements AIBehavior3D {
   private fireRate: number;
   private timer = 0;
-  private phase: Phase = 'approach'; // start heading straight at the player
+  private phase: Phase = 'cruise'; // start visible, cruising at mid-range
   private phaseTimer = 0;
   private idx: number;
-  private roamTarget = new THREE.Vector3();
+  private orbitAngle = 0;
 
   constructor(
     _aimAccuracy: number = AI.RUSTY_AIM_ACCURACY,
@@ -29,14 +29,7 @@ export class RustyBehavior3D implements AIBehavior3D {
     this.fireRate = fireRate;
     this.idx = enemyIndex++;
     this.timer = this.idx * 3;
-    this.pickNewRoamTarget();
-  }
-
-  private pickNewRoamTarget(): void {
-    const angle = Math.random() * Math.PI * 2;
-    const dist = 30 + Math.random() * 40;
-    const y = (Math.random() - 0.5) * 20;
-    this.roamTarget.set(Math.cos(angle) * dist, y, Math.sin(angle) * dist);
+    this.orbitAngle = this.idx * Math.PI * 0.7; // stagger orbits
   }
 
   update(self: Ship3D, target: Ship3D, dt: number, now: number): ShipInput & { fire: boolean } {
@@ -46,103 +39,123 @@ export class RustyBehavior3D implements AIBehavior3D {
 
     this.timer += dt;
     this.phaseTimer += dt;
+    this.orbitAngle += dt * (0.3 + this.idx * 0.1);
 
     const distToPlayer = self.position.distanceTo(target.position);
 
-    // Phase transitions — aggressive: short roam, fast approach, long attack runs
-    if (this.phase === 'roam' && this.phaseTimer > 1.5 + this.idx * 0.5) {
-      this.phase = 'approach';
+    // ── Phase transitions — longer, more gradual engagement ──
+    if (this.phase === 'cruise' && this.phaseTimer > 6 + this.idx * 2) {
+      // After cruising visibly, start closing in
+      this.phase = 'closing';
       this.phaseTimer = 0;
-    } else if (this.phase === 'approach' && (distToPlayer < 35 || this.phaseTimer > 3)) {
-      this.phase = 'attack';
+    } else if (this.phase === 'closing' && (distToPlayer < 80 || this.phaseTimer > 8)) {
+      // Close enough for dogfight
+      this.phase = 'dogfight';
       this.phaseTimer = 0;
-    } else if (this.phase === 'attack' && this.phaseTimer > 5) {
-      // Longer attack runs before retreating
-      this.phase = 'retreat';
+    } else if (this.phase === 'dogfight' && this.phaseTimer > 10) {
+      // Long dogfight, then break away for another pass
+      this.phase = 'breakaway';
       this.phaseTimer = 0;
-      this.pickNewRoamTarget();
-    } else if (this.phase === 'retreat' && (distToPlayer > 60 || this.phaseTimer > 1.5)) {
-      // Short retreat, then immediately back to hunting
-      this.phase = 'approach'; // skip roam — go straight back to approaching
+    } else if (this.phase === 'breakaway' && (distToPlayer > 250 || this.phaseTimer > 4)) {
+      // Pull out to visible range, then cruise again
+      this.phase = 'cruise';
       this.phaseTimer = 0;
     }
 
-    let desiredPos = new THREE.Vector3();
+    const desiredPos = new THREE.Vector3();
 
     switch (this.phase) {
-      case 'roam':
-        // Drift toward a random point in the arena
-        desiredPos.copy(this.roamTarget);
-        // Pick new target if close
-        if (self.position.distanceTo(this.roamTarget) < 10) {
-          this.pickNewRoamTarget();
-        }
-        break;
-
-      case 'approach': {
-        // Head-on approach with aggressive evasive weaving — hard to hit
-        desiredPos.copy(target.position);
-
-        // Weave laterally and vertically while closing distance
-        const weaveSpeed = 2.0 + this.idx * 0.5;
-        const weaveAmplitude = 30 + this.idx * 10; // wider weave per enemy
-        const lateralWeave = Math.sin(this.timer * weaveSpeed + this.idx * 2.1) * weaveAmplitude;
-        const verticalWeave = Math.cos(this.timer * weaveSpeed * 0.7 + this.idx * 1.3) * weaveAmplitude * 0.6;
-
-        // Perpendicular to the line between enemy and player
-        const toPlayer = target.position.clone().sub(self.position).normalize();
-        const right = new THREE.Vector3(-toPlayer.z, 0, toPlayer.x);
-
-        desiredPos.addScaledVector(right, lateralWeave);
-        desiredPos.y += verticalWeave;
-        break;
-      }
-
-      case 'attack': {
-        // Maneuver to the player's BLIND SPOTS — behind, above, or below.
-        // Get the player's forward direction and position behind them.
-        const playerFwd = target.getForward();
-
-        // Primary attack vector: get behind the player
-        const behindOffset = playerFwd.clone().multiplyScalar(-25); // 25 units behind
-
-        // Add weaving motion so enemies aren't in a static line
-        const weaveAngle = this.timer * 1.2 + this.idx * Math.PI * 0.7;
-        const weaveRight = new THREE.Vector3(-playerFwd.z, 0, playerFwd.x); // perpendicular to forward
-        const weaveAmount = Math.sin(weaveAngle) * 12;
-
-        // Some enemies attack from above/below instead of directly behind
-        const verticalBias = Math.cos(this.idx * 1.7 + this.timer * 0.5) * 12;
+      case 'cruise': {
+        // Orbit the player at mid-range — clearly visible, building tension
+        // Enemy flies in wide arcs around the player like a circling predator
+        const orbitRadius = 250 + this.idx * 60;
+        const verticalWave = Math.sin(this.timer * 0.4 + this.idx) * 40;
 
         desiredPos.set(
-          target.position.x + behindOffset.x + weaveRight.x * weaveAmount,
-          target.position.y + verticalBias,
-          target.position.z + behindOffset.z + weaveRight.z * weaveAmount,
+          target.position.x + Math.cos(this.orbitAngle) * orbitRadius,
+          target.position.y + verticalWave,
+          target.position.z + Math.sin(this.orbitAngle) * orbitRadius,
         );
         break;
       }
 
-      case 'retreat':
-        // Pull away to roam target
-        desiredPos.copy(this.roamTarget);
+      case 'closing': {
+        // Gradually spiral inward toward the player — the chase
+        // Shrinks orbit radius over time while weaving
+        const closingProgress = Math.min(1, this.phaseTimer / 8);
+        const radius = 250 * (1 - closingProgress * 0.7); // 250 → 75
+        const weaveSpeed = 1.5 + this.idx * 0.3;
+        const lateralWeave = Math.sin(this.timer * weaveSpeed) * 20;
+        const verticalWeave = Math.cos(this.timer * weaveSpeed * 0.6) * 15;
+
+        const toPlayer = target.position.clone().sub(self.position);
+        if (toPlayer.length() > 0.1) toPlayer.normalize();
+        const right = new THREE.Vector3(-toPlayer.z, 0, toPlayer.x);
+
+        // Aim ahead of the player but offset to the side
+        desiredPos.copy(target.position);
+        desiredPos.addScaledVector(right, Math.cos(this.orbitAngle) * radius);
+        desiredPos.y += Math.sin(this.orbitAngle) * radius * 0.4 + verticalWeave;
+        desiredPos.addScaledVector(right, lateralWeave);
         break;
+      }
+
+      case 'dogfight': {
+        // Close-range maneuvering — fly around the player at combat distance
+        // Mix of orbiting and darting behind
+        const playerFwd = target.getForward();
+        const combatRadius = 60 + Math.sin(this.timer * 0.8) * 30; // 30-90 range
+
+        // Orbit with bias toward getting behind the player
+        const behindBias = playerFwd.clone().multiplyScalar(-40);
+        const weaveRight = new THREE.Vector3(-playerFwd.z, 0, playerFwd.x);
+        const orbitOffset = Math.sin(this.orbitAngle * 1.5) * combatRadius;
+        const verticalBias = Math.cos(this.idx * 1.7 + this.timer * 0.6) * 25;
+
+        desiredPos.set(
+          target.position.x + behindBias.x + weaveRight.x * orbitOffset,
+          target.position.y + verticalBias,
+          target.position.z + behindBias.z + weaveRight.z * orbitOffset,
+        );
+        break;
+      }
+
+      case 'breakaway': {
+        // Fly away from the player to reset — pull out to visible range
+        const awayDir = self.position.clone().sub(target.position);
+        if (awayDir.length() < 0.1) awayDir.set(1, 0, 0);
+        awayDir.normalize();
+
+        // Fly outward with a slight curve
+        const curveRight = new THREE.Vector3(-awayDir.z, 0, awayDir.x);
+        const curve = Math.sin(this.timer * 2) * 50;
+
+        desiredPos.copy(self.position);
+        desiredPos.addScaledVector(awayDir, 120);
+        desiredPos.addScaledVector(curveRight, curve);
+        desiredPos.y += Math.sin(this.timer * 1.5) * 20;
+        break;
+      }
     }
 
-    // Move toward desired position — faster lerp for snappier movement
-    const lerpRate = Math.min(1, dt * 3.5);
+    // Smooth movement — slower lerp for visible, cinematic flight paths
+    const lerpRate = this.phase === 'dogfight'
+      ? Math.min(1, dt * 2.5) // snappier in close combat
+      : Math.min(1, dt * 1.2); // smooth and visible at range
     self.position.x += (desiredPos.x - self.position.x) * lerpRate;
     self.position.y += (desiredPos.y - self.position.y) * lerpRate;
     self.position.z += (desiredPos.z - self.position.z) * lerpRate;
 
-    // Face the player
+    // Face the player (or face direction of travel during breakaway)
+    const lookTarget = this.phase === 'breakaway' ? desiredPos : target.position;
     const lookMat = new THREE.Matrix4();
-    lookMat.lookAt(self.position, target.position, new THREE.Vector3(0, 1, 0));
+    lookMat.lookAt(self.position, lookTarget, new THREE.Vector3(0, 1, 0));
     const lookQuat = new THREE.Quaternion().setFromRotationMatrix(lookMat);
-    self.group.quaternion.slerp(lookQuat, Math.min(1, dt * 6));
+    self.group.quaternion.slerp(lookQuat, Math.min(1, dt * 4));
 
-    // Only fire during approach and attack phases
+    // Fire during closing and dogfight phases, at longer range
     let fire = false;
-    if ((this.phase === 'approach' || this.phase === 'attack') && distToPlayer < 80) {
+    if ((this.phase === 'closing' || this.phase === 'dogfight') && distToPlayer < 200) {
       if (now - self.lastFireTime >= this.fireRate) {
         fire = true;
       }

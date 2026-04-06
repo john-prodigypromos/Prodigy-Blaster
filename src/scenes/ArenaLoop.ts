@@ -77,11 +77,11 @@ export function createArenaState(
     enemyGeo.scale.set(3, 3, 3); // triple size for maximum visibility
     applyMaterials(enemyGeo, createEnemyMaterials());
 
-    // Spawn far away — must hunt them down. Distance increases per level.
+    // Spawn at visible mid-range — close enough to see, far enough to chase
     const angle = Math.random() * Math.PI * 2;
-    const baseDist = 43200 + level * 21600; // L1: 64800, L2: 86400, L3: 108000
-    const dist = baseDist + Math.random() * 28800;
-    const elevation = (Math.random() - 0.5) * 60 + i * 25; // spread vertically too
+    const baseDist = 600 + level * 200; // L1: 800, L2: 1000, L3: 1200
+    const dist = baseDist + Math.random() * 400;
+    const elevation = (Math.random() - 0.5) * 60 + i * 25;
     enemyGeo.position.set(
       Math.cos(angle) * dist,
       elevation,
