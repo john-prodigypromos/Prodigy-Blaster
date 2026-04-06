@@ -10,8 +10,8 @@ let normalMap: THREE.CanvasTexture | null = null;
 let roughnessMap: THREE.CanvasTexture | null = null;
 
 function getSharedTextures() {
-  if (!normalMap) normalMap = createNormalMap(512, 101);
-  if (!roughnessMap) roughnessMap = createRoughnessMap(512, 202);
+  if (!normalMap) normalMap = createNormalMap(1024, 101);
+  if (!roughnessMap) roughnessMap = createRoughnessMap(1024, 202);
   return { normalMap, roughnessMap };
 }
 
@@ -21,6 +21,8 @@ export interface ShipMaterialSet {
   engine: THREE.MeshStandardMaterial;
   nozzle: THREE.MeshBasicMaterial;
   engineLight: THREE.PointLight;
+  accent?: THREE.MeshStandardMaterial;     // red accent strip lighting
+  armorDark?: THREE.MeshPhysicalMaterial;  // darker armor panels
 }
 
 /** Player ship materials — blue-steel metallic with cyan engine glow. */
@@ -67,50 +69,76 @@ export function createPlayerMaterials(characterColor?: number): ShipMaterialSet 
   return { hull, cockpit, engine, nozzle, engineLight };
 }
 
-/** Enemy ship materials — dark red metallic with orange engine glow. */
+/** Enemy ship materials — dark gunmetal hull, red accent lighting, bright engine glow.
+ *  Inspired by cinematic sci-fi fighters: dark industrial metal with menacing red strips. */
 export function createEnemyMaterials(): ShipMaterialSet {
   const { normalMap, roughnessMap } = getSharedTextures();
 
+  // Main hull — dark gunmetal steel, almost black with subtle metallic sheen
   const hull = new THREE.MeshPhysicalMaterial({
-    color: 0xcc4444,
-    emissive: 0x331111,
-    emissiveIntensity: 0.8,
-    metalness: 0.7,
-    roughness: 0.5,
+    color: 0x1a1a22,
+    emissive: 0x050508,
+    emissiveIntensity: 0.3,
+    metalness: 0.85,
+    roughness: 0.35,
     normalMap: normalMap,
     roughnessMap: roughnessMap,
-    clearcoat: 0.3,
-    clearcoatRoughness: 0.2,
+    clearcoat: 0.4,
+    clearcoatRoughness: 0.15,
   });
 
+  // Darker armor panels — even darker for panel contrast
+  const armorDark = new THREE.MeshPhysicalMaterial({
+    color: 0x111118,
+    metalness: 0.9,
+    roughness: 0.25,
+    normalMap: normalMap,
+    roughnessMap: roughnessMap,
+    clearcoat: 0.5,
+    clearcoatRoughness: 0.1,
+  });
+
+  // Cockpit slit — menacing red glow
   const cockpit = new THREE.MeshPhysicalMaterial({
-    color: 0xff2222,
-    emissive: 0x440000,
-    emissiveIntensity: 1.0,
+    color: 0x220000,
+    emissive: 0xff1111,
+    emissiveIntensity: 2.5,
+    metalness: 0.1,
+    roughness: 0.1,
+    transmission: 0.2,
+    thickness: 0.3,
+  });
+
+  // Red accent strip material — glowing edge lighting
+  const accent = new THREE.MeshStandardMaterial({
+    color: 0x110000,
+    emissive: 0xff2200,
+    emissiveIntensity: 3.0,
     metalness: 0.2,
-    roughness: 0.15,
-    transmission: 0.3,
-    thickness: 0.5,
+    roughness: 0.3,
   });
 
+  // Engine core — intense white-orange glow
   const engine = new THREE.MeshStandardMaterial({
-    color: 0x444444,
-    metalness: 0.85,
-    roughness: 0.4,
-    emissive: 0x993300,
-    emissiveIntensity: 0.8,
+    color: 0x222222,
+    metalness: 0.9,
+    roughness: 0.3,
+    emissive: 0xff6622,
+    emissiveIntensity: 3.0,
   });
 
+  // Nozzle — bright hot exhaust
   const nozzle = new THREE.MeshBasicMaterial({
-    color: 0xcc6622,
+    color: 0xff8844,
     transparent: true,
-    opacity: 0.6,
+    opacity: 0.85,
     side: THREE.DoubleSide,
   });
 
-  const engineLight = new THREE.PointLight(0xcc5500, 4, 60, 2);
+  // Stronger engine light — dramatic orange/red cast
+  const engineLight = new THREE.PointLight(0xff4400, 8, 100, 2);
 
-  return { hull, cockpit, engine, nozzle, engineLight };
+  return { hull, cockpit, engine, nozzle, engineLight, accent, armorDark };
 }
 
 /** Apply materials to a ship geometry group by mesh name. */
@@ -125,6 +153,10 @@ export function applyMaterials(group: THREE.Group, mats: ShipMaterialSet): void 
       child.material = mats.nozzle;
     } else if (name.startsWith('engine')) {
       child.material = mats.engine;
+    } else if (name.startsWith('accent') && mats.accent) {
+      child.material = mats.accent;
+    } else if (name.startsWith('armor-dark') && mats.armorDark) {
+      child.material = mats.armorDark;
     } else {
       child.material = mats.hull;
     }

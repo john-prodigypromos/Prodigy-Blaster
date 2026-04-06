@@ -7,6 +7,12 @@ import * as THREE from 'three';
 import { Ship3D } from '../entities/Ship3D';
 import { currentCharacter } from '../state/Character';
 
+/** Villain names — mapped by enemy index across all levels. */
+const ENEMY_NAMES = ['BOLO TIE', 'BOW TIE', 'BISHOP'];
+
+/** Villain portrait filenames in public/portraits/ — mapped by enemy index. */
+const ENEMY_PORTRAITS = ['bolo-tie.jpg', 'bow-tie.jpg', 'bishop.jpg'];
+
 function el(tag: string, attrs: Record<string, string> = {}, text?: string): HTMLElement {
   const e = document.createElement(tag);
   for (const [k, v] of Object.entries(attrs)) {
@@ -32,7 +38,7 @@ export class HUD3D {
     // Inject scoped styles
     const style = document.createElement('style');
     style.textContent = `
-      #hud { position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:20;font-family:Arial,sans-serif; }
+      #hud { position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:20;font-family:Rajdhani,sans-serif; }
       .hud-top-left { position:absolute;top:16px;left:16px; }
       .hud-bar-container { width:200px;height:14px;background:rgba(0,0,0,0.6);border:1px solid rgba(255,255,255,0.2);border-radius:2px;margin-bottom:6px;overflow:hidden; }
       .hud-bar-fill { height:100%;transition:width 0.15s ease-out; }
@@ -79,7 +85,7 @@ export class HUD3D {
     const pilotImg = document.createElement('img');
     pilotImg.src = `/portraits/${currentCharacter}.jpg`;
     pilotImg.alt = currentCharacter;
-    pilotImg.style.cssText = 'width:36px;height:36px;border-radius:50%;object-fit:cover;border:2px solid #88aacc;';
+    pilotImg.style.cssText = 'width:60px;height:60px;border-radius:50%;object-fit:cover;border:2px solid #88aacc;';
     pilotRow.appendChild(pilotImg);
     const pilotName = document.createElement('div');
     pilotName.textContent = currentCharacter.toUpperCase();
@@ -212,12 +218,24 @@ export class HUD3D {
         `;
         tracker.appendChild(arrow);
 
-        // Label
+        // Portrait + label row
         const dist = Math.round(enemy.position.distanceTo(camera.position));
+        const labelRow = document.createElement('div');
+        labelRow.style.cssText = 'display:flex;align-items:center;gap:4px;margin-top:2px;justify-content:center;';
+
+        const portraitFile = ENEMY_PORTRAITS[i];
+        if (portraitFile) {
+          const img = document.createElement('img');
+          img.src = `/portraits/${portraitFile}`;
+          img.style.cssText = 'width:75px;height:75px;border-radius:50%;object-fit:cover;border:2px solid #ff4444;filter:drop-shadow(0 0 3px rgba(255,0,0,0.4));';
+          labelRow.appendChild(img);
+        }
+
         const label = document.createElement('div');
-        label.textContent = `VOX ${i + 1} [${dist}m]`;
-        label.style.cssText = 'font-size:10px;color:#ff4444;font-family:Arial;white-space:nowrap;margin-top:2px;';
-        tracker.appendChild(label);
+        label.textContent = `${ENEMY_NAMES[i] ?? `ENEMY ${i + 1}`} [${dist}m]`;
+        label.style.cssText = 'font-size:10px;color:#ff4444;font-family:Rajdhani,sans-serif;white-space:nowrap;';
+        labelRow.appendChild(label);
+        tracker.appendChild(labelRow);
 
         this.container.appendChild(tracker);
         this.enemyHUDs.push(tracker);
@@ -230,19 +248,32 @@ export class HUD3D {
         left:${sx}px;top:${sy}px;transform:translate(-50%,-50%);
       `;
 
+      // Portrait + name row
+      const nameRow = document.createElement('div');
+      nameRow.style.cssText = 'display:flex;align-items:center;gap:6px;justify-content:center;margin-bottom:4px;';
+
+      const portraitFile = ENEMY_PORTRAITS[i];
+      if (portraitFile) {
+        const img = document.createElement('img');
+        img.src = `/portraits/${portraitFile}`;
+        img.style.cssText = 'width:96px;height:96px;border-radius:50%;object-fit:cover;border:2px solid #ff4444;filter:drop-shadow(0 0 6px rgba(255,0,0,0.5));';
+        nameRow.appendChild(img);
+      }
+
       const label = document.createElement('div');
-      label.textContent = `VOX ${i + 1}`;
+      label.textContent = ENEMY_NAMES[i] ?? `ENEMY ${i + 1}`;
       label.style.cssText = `
-        font-size:13px;font-weight:bold;color:#ff4444;font-family:Arial,sans-serif;
-        letter-spacing:2px;margin-bottom:4px;
+        font-size:13px;font-weight:bold;color:#ff4444;font-family:Rajdhani,sans-serif;
+        letter-spacing:2px;
         text-shadow:0 0 6px rgba(255,0,0,0.5);
       `;
-      hud.appendChild(label);
+      nameRow.appendChild(label);
+      hud.appendChild(nameRow);
 
       // Health bar background
       const barBg = document.createElement('div');
       barBg.style.cssText = `
-        width:100px;height:8px;background:rgba(0,0,0,0.7);
+        width:130px;height:10px;background:rgba(0,0,0,0.7);
         border:1px solid #ff4444;border-radius:2px;overflow:hidden;
         margin:0 auto;
       `;
@@ -261,7 +292,7 @@ export class HUD3D {
       // HP text
       const hpText = document.createElement('div');
       hpText.textContent = `${Math.ceil(enemy.hull)}/${enemy.maxHull}`;
-      hpText.style.cssText = 'font-size:10px;color:#ff8888;font-family:Arial;margin-top:2px;';
+      hpText.style.cssText = 'font-size:10px;color:#ff8888;font-family:Rajdhani,sans-serif;margin-top:2px;';
       hud.appendChild(hpText);
 
       this.container.appendChild(hud);

@@ -29,15 +29,16 @@ export function createRenderer(canvas: HTMLCanvasElement): RendererBundle {
     antialias: false, // SMAA handles AA via post-processing
     powerPreference: 'high-performance',
   });
-  renderer.setPixelRatio(isMobile ? 1 : Math.min(window.devicePixelRatio, 2));
+  // Higher pixel ratio for sharper rendering — desktop gets full DPR, mobile gets 2×
+  renderer.setPixelRatio(isMobile ? Math.min(window.devicePixelRatio, 2) : Math.min(window.devicePixelRatio, 3));
   renderer.setSize(w, h);
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 0.8;
+  renderer.toneMappingExposure = 0.9; // slightly brighter exposure for cinematic space look
   renderer.outputColorSpace = THREE.SRGBColorSpace;
 
   // ── Scene ──
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x020508);
+  scene.background = new THREE.Color(0x010208); // near-black with barely perceptible blue
 
   // ── Camera ──
   const camera = new THREE.PerspectiveCamera(75, w / h, 0.1, 10000);
@@ -47,12 +48,12 @@ export function createRenderer(canvas: HTMLCanvasElement): RendererBundle {
   const composer = new EffectComposer(renderer);
   composer.addPass(new RenderPass(scene, camera));
 
-  // Bloom — always half-res for performance
+  // Bloom — full resolution, tuned for subtle star glow + bright engine flare
   const bloomPass = new UnrealBloomPass(
-    new THREE.Vector2(Math.floor(w / 2), Math.floor(h / 2)),
-    0.5,  // strength
-    0.4,  // radius
-    0.95, // threshold
+    new THREE.Vector2(w, h),
+    0.55,  // strength — visible but not overpowering
+    0.5,   // radius — moderate spread
+    0.82,  // threshold — only catches genuinely bright emissives + engine glow
   );
   composer.addPass(bloomPass);
 

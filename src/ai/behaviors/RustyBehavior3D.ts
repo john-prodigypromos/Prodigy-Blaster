@@ -49,21 +49,22 @@ export class RustyBehavior3D implements AIBehavior3D {
 
     const distToPlayer = self.position.distanceTo(target.position);
 
-    // Phase transitions
-    if (this.phase === 'roam' && this.phaseTimer > 3 + this.idx) {
+    // Phase transitions — aggressive: short roam, fast approach, long attack runs
+    if (this.phase === 'roam' && this.phaseTimer > 1.5 + this.idx * 0.5) {
       this.phase = 'approach';
       this.phaseTimer = 0;
-    } else if (this.phase === 'approach' && (distToPlayer < 25 || this.phaseTimer > 4)) {
+    } else if (this.phase === 'approach' && (distToPlayer < 35 || this.phaseTimer > 3)) {
       this.phase = 'attack';
       this.phaseTimer = 0;
-    } else if (this.phase === 'attack' && this.phaseTimer > 3) {
+    } else if (this.phase === 'attack' && this.phaseTimer > 5) {
+      // Longer attack runs before retreating
       this.phase = 'retreat';
       this.phaseTimer = 0;
       this.pickNewRoamTarget();
-    } else if (this.phase === 'retreat' && (distToPlayer > 40 || this.phaseTimer > 2)) {
-      this.phase = 'roam';
+    } else if (this.phase === 'retreat' && (distToPlayer > 60 || this.phaseTimer > 1.5)) {
+      // Short retreat, then immediately back to hunting
+      this.phase = 'approach'; // skip roam — go straight back to approaching
       this.phaseTimer = 0;
-      this.pickNewRoamTarget();
     }
 
     let desiredPos = new THREE.Vector3();
@@ -78,26 +79,40 @@ export class RustyBehavior3D implements AIBehavior3D {
         }
         break;
 
-      case 'approach':
-        // Fly toward the player
+      case 'approach': {
+        // Sweep toward the player's flanks to set up a blind-spot attack run
+        const approachFwd = target.getForward();
+        const flanking = new THREE.Vector3(-approachFwd.z, 0, approachFwd.x); // perpendicular
+        const side = (this.idx % 2 === 0) ? 1 : -1; // alternate left/right flanking
         desiredPos.copy(target.position);
-        const approachOffset = new THREE.Vector3(
-          Math.sin(this.timer * 0.8 + this.idx) * 15,
-          Math.sin(this.timer * 0.5 + this.idx) * 5,
-          Math.cos(this.timer * 0.8 + this.idx) * 15,
-        );
-        desiredPos.add(approachOffset);
+        desiredPos.addScaledVector(flanking, side * 20);
+        desiredPos.y += Math.sin(this.timer * 0.5 + this.idx) * 8;
         break;
+      }
 
-      case 'attack':
-        // Circle close to the player, strafing
-        const attackAngle = this.timer * 1.5 + this.idx * 2;
+      case 'attack': {
+        // Maneuver to the player's BLIND SPOTS — behind, above, or below.
+        // Get the player's forward direction and position behind them.
+        const playerFwd = target.getForward();
+
+        // Primary attack vector: get behind the player
+        const behindOffset = playerFwd.clone().multiplyScalar(-25); // 25 units behind
+
+        // Add weaving motion so enemies aren't in a static line
+        const weaveAngle = this.timer * 1.2 + this.idx * Math.PI * 0.7;
+        const weaveRight = new THREE.Vector3(-playerFwd.z, 0, playerFwd.x); // perpendicular to forward
+        const weaveAmount = Math.sin(weaveAngle) * 12;
+
+        // Some enemies attack from above/below instead of directly behind
+        const verticalBias = Math.cos(this.idx * 1.7 + this.timer * 0.5) * 12;
+
         desiredPos.set(
-          target.position.x + Math.cos(attackAngle) * 20,
-          target.position.y + Math.sin(this.timer * 2) * 5,
-          target.position.z + Math.sin(attackAngle) * 20,
+          target.position.x + behindOffset.x + weaveRight.x * weaveAmount,
+          target.position.y + verticalBias,
+          target.position.z + behindOffset.z + weaveRight.z * weaveAmount,
         );
         break;
+      }
 
       case 'retreat':
         // Pull away to roam target
@@ -105,8 +120,8 @@ export class RustyBehavior3D implements AIBehavior3D {
         break;
     }
 
-    // Move toward desired position
-    const lerpRate = Math.min(1, dt * 2.5);
+    // Move toward desired position — faster lerp for snappier movement
+    const lerpRate = Math.min(1, dt * 3.5);
     self.position.x += (desiredPos.x - self.position.x) * lerpRate;
     self.position.y += (desiredPos.y - self.position.y) * lerpRate;
     self.position.z += (desiredPos.z - self.position.z) * lerpRate;
@@ -115,11 +130,11 @@ export class RustyBehavior3D implements AIBehavior3D {
     const lookMat = new THREE.Matrix4();
     lookMat.lookAt(self.position, target.position, new THREE.Vector3(0, 1, 0));
     const lookQuat = new THREE.Quaternion().setFromRotationMatrix(lookMat);
-    self.group.quaternion.slerp(lookQuat, Math.min(1, dt * 4));
+    self.group.quaternion.slerp(lookQuat, Math.min(1, dt * 6));
 
     // Only fire during approach and attack phases
     let fire = false;
-    if ((this.phase === 'approach' || this.phase === 'attack') && distToPlayer < 50) {
+    if ((this.phase === 'approach' || this.phase === 'attack') && distToPlayer < 80) {
       if (now - self.lastFireTime >= this.fireRate) {
         fire = true;
       }

@@ -55,7 +55,8 @@ export class TouchControls3D {
     this.thrustRadius = Math.round(ref * 0.07);
 
     const margin = Math.round(ref * 0.22);
-    this.joystickCenter = { x: margin, y: h - margin };
+    const joystickBottomMargin = Math.round(ref * 0.35); // extra clearance above score HUD
+    this.joystickCenter = { x: margin, y: h - joystickBottomMargin };
     this.fireCenter = { x: w - margin, y: h - margin };
     this.thrustCenter = { x: w - margin, y: h - margin - this.fireRadius * 3 };
 
@@ -81,7 +82,8 @@ export class TouchControls3D {
     this.thrustRadius = Math.round(ref * 0.07);
 
     const margin = Math.round(ref * 0.22);
-    this.joystickCenter = { x: margin, y: h - margin };
+    const joystickBottomMargin = Math.round(ref * 0.35); // extra clearance above score HUD
+    this.joystickCenter = { x: margin, y: h - joystickBottomMargin };
     this.fireCenter = { x: w - margin, y: h - margin };
     this.thrustCenter = { x: w - margin, y: h - margin - this.fireRadius * 3 };
   }
@@ -197,7 +199,7 @@ export class TouchControls3D {
 
     // Fire label
     ctx.fillStyle = 'rgba(255,102,68,0.6)';
-    ctx.font = 'bold 12px Arial';
+    ctx.font = 'bold 12px Rajdhani';
     ctx.textAlign = 'center';
     ctx.fillText('FIRE', this.fireCenter.x, this.fireCenter.y + 4);
 
@@ -210,7 +212,7 @@ export class TouchControls3D {
     ctx.stroke();
 
     ctx.fillStyle = 'rgba(0,136,255,0.6)';
-    ctx.font = 'bold 10px Arial';
+    ctx.font = 'bold 10px Rajdhani';
     ctx.fillText('THRUST', this.thrustCenter.x, this.thrustCenter.y + 4);
   }
 

@@ -46,19 +46,19 @@ export class BoltPool {
   constructor(scene: THREE.Scene) {
     this.scene = scene;
 
-    const playerBoltMat = new THREE.MeshBasicMaterial({ color: COLORS.playerBolt });
-    const enemyBoltMat = new THREE.MeshBasicMaterial({ color: COLORS.enemyBolt });
+    const playerBoltMat = new THREE.MeshBasicMaterial({ color: 0xffffff }); // white-hot core
+    const enemyBoltMat = new THREE.MeshBasicMaterial({ color: 0xffccaa }); // hot orange-white core
     const playerGlowMat = new THREE.MeshBasicMaterial({
       color: COLORS.playerBolt,
       transparent: true,
-      opacity: 0.3,
+      opacity: 0.45,
       blending: THREE.AdditiveBlending,
       depthWrite: false,
     });
     const enemyGlowMat = new THREE.MeshBasicMaterial({
       color: COLORS.enemyBolt,
       transparent: true,
-      opacity: 0.3,
+      opacity: 0.45,
       blending: THREE.AdditiveBlending,
       depthWrite: false,
     });

@@ -79,10 +79,11 @@ export function createArenaState(
     enemyGeo.scale.set(3, 3, 3); // triple size for maximum visibility
     applyMaterials(enemyGeo, createEnemyMaterials());
 
-    // Spawn at random positions around the player — must hunt for them
+    // Spawn far away — must hunt them down. Distance increases per level.
     const angle = Math.random() * Math.PI * 2;
-    const dist = 40 + Math.random() * 30;
-    const elevation = (Math.random() - 0.5) * 20;
+    const baseDist = 120 + level * 60; // L1: 180, L2: 240, L3: 300
+    const dist = baseDist + Math.random() * 80;
+    const elevation = (Math.random() - 0.5) * 60 + i * 25; // spread vertically too
     enemyGeo.position.set(
       Math.cos(angle) * dist,
       elevation,
@@ -116,7 +117,7 @@ export function createArenaState(
   const mouseControls = new MouseControls();
   const sound = new SoundSystem();
   sound.init();
-  sound.startMusic();
+  // Music already playing from title screen — don't restart
 
   return {
     player, enemies, enemyAIs,
@@ -150,14 +151,16 @@ export function updateArena(
 
   const input: ShipInput = {
     yaw: Math.max(-1, Math.min(1, mouse.yaw + touch.yaw)),
-    pitch: touch.pitch, // touch only for pitch (mobile)
+    pitch: 0, // pitch rotation disabled — vertical movement used instead
     roll: 0,
     thrust: 0,
   };
 
-  // Trackpad up/down moves ship vertically (not pitch rotation)
+  // Vertical movement: mouse (desktop) + joystick Y (mobile)
+  // Push up = ship goes up, push down = ship goes down
   const vertSpeed = 60;
-  player.position.y += mouse.verticalMove * vertSpeed * dt;
+  const touchVertical = Math.abs(touch.pitch) > 0 ? -touch.pitch : 0; // touch.pitch was inverted, re-invert for direct movement
+  player.position.y += (mouse.verticalMove + touchVertical) * vertSpeed * dt;
 
   // ── Player weapons — auto-aim at nearest alive enemy ──
   if (keys['Space'] || touch.fire) {
@@ -183,10 +186,6 @@ export function updateArena(
         state.sound.enemyShoot();
       }
     }
-    // Force-fire every 300ms as backup
-    if (now - enemy.lastFireTime > 300) {
-      tryFireWeapon(enemy, boltPool, now, undefined, player);
-    }
     // AI directly controls enemy position — skip physics
   }
 
@@ -207,53 +206,178 @@ export function updateArena(
         state.score += evt.damage * 10;
       }
 
-      // Sound + camera shake + screen flash on player hit
+      // Sound + camera shake + intense visual feedback on player hit
       if (evt.target === player) {
-        cockpitCam.shake(evt.shieldHit ? 0.8 : 1.5);
-        if (evt.shieldHit) state.sound.shieldHit();
+        const isShield = evt.shieldHit;
+        cockpitCam.shake(isShield ? 1.2 : 2.5);
+        if (isShield) state.sound.shieldHit();
         else state.sound.hullHit();
 
-        // Full-screen damage flash
+        const overlay = document.getElementById('ui-overlay')!;
+
+        // Full-screen damage flash — much more intense
         const flash = document.createElement('div');
-        const color = evt.shieldHit
-          ? 'rgba(0, 150, 255, 0.25)'   // blue for shield
-          : 'rgba(255, 100, 0, 0.3)';    // orange for hull
+        const color = isShield
+          ? 'rgba(0, 150, 255, 0.4)'    // bright blue for shield
+          : 'rgba(255, 50, 0, 0.5)';     // intense red-orange for hull
         flash.style.cssText = `
           position:fixed;top:0;left:0;width:100%;height:100%;
           background:${color};z-index:40;pointer-events:none;
-          transition:opacity 0.4s ease-out;
+          transition:opacity 0.5s ease-out;
         `;
-        document.getElementById('ui-overlay')!.appendChild(flash);
+        overlay.appendChild(flash);
         requestAnimationFrame(() => { flash.style.opacity = '0'; });
-        setTimeout(() => flash.remove(), 500);
-      }
+        setTimeout(() => flash.remove(), 600);
 
-      // Project enemy position to screen for explosions
-      const w = window.innerWidth;
-      const h = window.innerHeight;
-      let ex = w / 2;
-      let ey = h / 2;
+        // Damage vignette — dark edges that persist briefly
+        if (!isShield) {
+          const vignette = document.createElement('div');
+          vignette.style.cssText = `
+            position:fixed;top:0;left:0;width:100%;height:100%;
+            z-index:39;pointer-events:none;
+            background:radial-gradient(ellipse at center, transparent 40%, rgba(255,0,0,0.3) 100%);
+            transition:opacity 0.8s ease-out;
+          `;
+          overlay.appendChild(vignette);
+          requestAnimationFrame(() => { vignette.style.opacity = '0'; });
+          setTimeout(() => vignette.remove(), 900);
+        }
 
-      if (!evt.target.isPlayer) {
-        const proj = evt.target.position.clone().project(state.camera);
-        if (proj.z < 1) {
-          ex = (proj.x * 0.5 + 0.5) * w;
-          ey = (-proj.y * 0.5 + 0.5) * h;
+        // Shield shimmer effect — blue ripple from edges
+        if (isShield) {
+          const shimmer = document.createElement('div');
+          shimmer.style.cssText = `
+            position:fixed;top:0;left:0;width:100%;height:100%;
+            z-index:39;pointer-events:none;
+            border:8px solid rgba(0,180,255,0.6);
+            box-shadow:inset 0 0 80px rgba(0,150,255,0.3), inset 0 0 160px rgba(0,100,255,0.15);
+            transition:opacity 0.4s ease-out;
+          `;
+          overlay.appendChild(shimmer);
+          requestAnimationFrame(() => { shimmer.style.opacity = '0'; });
+          setTimeout(() => shimmer.remove(), 500);
+        }
+
+        // Directional hit streak — bright line across screen
+        const streak = document.createElement('div');
+        const angle = Math.random() * 360;
+        streak.style.cssText = `
+          position:fixed;top:50%;left:50%;width:200vw;height:3px;
+          transform:translate(-50%,-50%) rotate(${angle}deg);
+          background:linear-gradient(90deg, transparent, ${isShield ? 'rgba(0,200,255,0.6)' : 'rgba(255,100,0,0.7)'}, transparent);
+          z-index:41;pointer-events:none;
+          transition:opacity 0.3s ease-out;
+        `;
+        overlay.appendChild(streak);
+        requestAnimationFrame(() => { streak.style.opacity = '0'; });
+        setTimeout(() => streak.remove(), 400);
+
+        // Critical damage warning — persistent red pulse when hull is low
+        if (player.damagePct > 0.6) {
+          const warning = document.createElement('div');
+          warning.style.cssText = `
+            position:fixed;top:0;left:0;width:100%;height:100%;
+            z-index:38;pointer-events:none;
+            background:radial-gradient(ellipse at center, transparent 30%, rgba(180,0,0,0.15) 100%);
+            animation:critPulse 0.5s ease-in-out;
+          `;
+          overlay.appendChild(warning);
+          setTimeout(() => warning.remove(), 500);
+
+          // Inject animation if not already present
+          if (!document.getElementById('crit-pulse-css')) {
+            const style = document.createElement('style');
+            style.id = 'crit-pulse-css';
+            style.textContent = `@keyframes critPulse { 0%,100%{opacity:0} 50%{opacity:1} }`;
+            document.head.appendChild(style);
+          }
         }
       }
 
-      // Impact flash at enemy position
+      // Project enemy position to screen for hit flashes
       if (!evt.target.isPlayer) {
-        explosions.spawnHit(ex, ey);
+        const w = window.innerWidth;
+        const h = window.innerHeight;
+        const proj = evt.target.position.clone().project(state.camera);
+        if (proj.z < 1) {
+          const ex = (proj.x * 0.5 + 0.5) * w;
+          const ey = (-proj.y * 0.5 + 0.5) * h;
+          explosions.spawnHit(ex, ey);
+        }
       }
 
-      // DEATH — explosion at enemy position
+      // DEATH — world-anchored explosion locked to exact death position
       if (!evt.target.alive) {
-        explosions.spawnDeath(ex, ey);
-        state.sound.explosion();
         if (!evt.target.isPlayer) {
+          const deathPos = evt.target.position.clone();
+          explosions.spawnDeathWorld(deathPos, state.camera);
           state.score += 500;
           evt.target.group.visible = false;
+        }
+        state.sound.explosion();
+
+        // ── PLAYER DEATH — massive full-screen explosion sequence ──
+        if (evt.target.isPlayer) {
+          const overlay = document.getElementById('ui-overlay')!;
+          cockpitCam.shake(5.0); // extreme shake
+
+          // Blinding white flash
+          const whiteFlash = document.createElement('div');
+          whiteFlash.style.cssText = `
+            position:fixed;top:0;left:0;width:100%;height:100%;
+            background:white;z-index:50;pointer-events:none;
+            opacity:0.9;transition:opacity 1.5s ease-out;
+          `;
+          overlay.appendChild(whiteFlash);
+          requestAnimationFrame(() => { whiteFlash.style.opacity = '0'; });
+          setTimeout(() => whiteFlash.remove(), 1600);
+
+          // Multiple screen-center explosions — staggered
+          const cx = window.innerWidth / 2;
+          const cy = window.innerHeight / 2;
+          for (let i = 0; i < 5; i++) {
+            setTimeout(() => {
+              explosions.spawnDeath(
+                cx + (Math.random() - 0.5) * 300,
+                cy + (Math.random() - 0.5) * 200,
+              );
+            }, i * 200);
+          }
+
+          // Massive center fireball
+          explosions.spawnAt(cx, cy, 500, 'boom1', 3.0);
+
+          // Red damage vignette that lingers
+          const deathVignette = document.createElement('div');
+          deathVignette.style.cssText = `
+            position:fixed;top:0;left:0;width:100%;height:100%;
+            z-index:45;pointer-events:none;
+            background:radial-gradient(ellipse at center, transparent 20%, rgba(200,0,0,0.5) 80%, rgba(100,0,0,0.8) 100%);
+            transition:opacity 2.0s ease-out;
+          `;
+          overlay.appendChild(deathVignette);
+          setTimeout(() => {
+            deathVignette.style.opacity = '0';
+            setTimeout(() => deathVignette.remove(), 2100);
+          }, 1500);
+
+          // Screen crack overlay effect
+          const cracks = document.createElement('div');
+          cracks.style.cssText = `
+            position:fixed;top:0;left:0;width:100%;height:100%;
+            z-index:46;pointer-events:none;
+            background:
+              linear-gradient(${35 + Math.random()*20}deg, transparent 48%, rgba(255,255,255,0.15) 49%, rgba(255,255,255,0.15) 51%, transparent 52%),
+              linear-gradient(${140 + Math.random()*30}deg, transparent 48%, rgba(255,255,255,0.1) 49%, rgba(255,255,255,0.1) 51%, transparent 52%),
+              linear-gradient(${80 + Math.random()*20}deg, transparent 47%, rgba(255,255,255,0.12) 49%, rgba(255,255,255,0.12) 51%, transparent 53%),
+              linear-gradient(${200 + Math.random()*30}deg, transparent 48%, rgba(255,255,255,0.08) 49.5%, rgba(255,255,255,0.08) 50.5%, transparent 52%);
+            transition:opacity 3.0s ease-out;
+          `;
+          overlay.appendChild(cracks);
+          setTimeout(() => {
+            cracks.style.opacity = '0';
+            setTimeout(() => cracks.remove(), 3100);
+          }, 2000);
         }
       }
     } catch (e) {
@@ -281,16 +405,14 @@ export function updateArena(
   if (!player.alive && !state.gameOver) {
     state.gameOver = true;
     state.gameOverTime = now;
-    state.sound.stopMusic();
-    state.sound.defeat();
+    // Music keeps playing through game over screen
   }
 
   const allEnemiesDead = enemies.every(e => !e.alive);
   if (allEnemiesDead && !state.victory) {
     state.victory = true;
     state.victoryTime = now;
-    state.sound.stopMusic();
-    state.sound.victory();
+    // Music keeps playing through victory screen
   }
   } catch (e) {
     console.error('Arena update error:', e);

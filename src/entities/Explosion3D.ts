@@ -1,6 +1,9 @@
 // ── Explosion3D — Screen-space DOM explosions ────────────
-// Spawns at screen pixel coordinates. No 3D projection needed.
-// Caller is responsible for converting world→screen before spawning.
+// Spawns at screen pixel coordinates or anchored to a 3D world position.
+// World-anchored explosions re-project each fireball so the explosion
+// stays locked to the death location even as the camera moves.
+
+import * as THREE from 'three';
 
 let cssInjected = false;
 function injectCSS() {
@@ -93,28 +96,63 @@ export class ExplosionPool {
     this.spawnAt(screenX, screenY, 50, 'hit-flash', 0.4);
   }
 
-  /** Chaotic multi-stage death explosion — lots of random variation */
+  /** Chaotic multi-stage death explosion — screen-space fallback */
   spawnDeath(screenX: number, screenY: number): void {
-    const jit = () => (Math.random() - 0.5) * 150; // wide scatter
-    const rSize = () => 100 + Math.random() * 200;  // random sizes
-    const rDur = () => 1.5 + Math.random() * 2.0;   // random durations
+    this.spawnDeathAt(screenX, screenY);
+  }
+
+  /** World-anchored death explosion — re-projects from 3D each fireball so
+   *  the explosion stays locked to the death point as the camera moves. */
+  spawnDeathWorld(worldPos: THREE.Vector3, camera: THREE.PerspectiveCamera): void {
+    const w = window.innerWidth;
+    const h = window.innerHeight;
+
+    const project = (): { x: number; y: number; visible: boolean } => {
+      const proj = worldPos.clone().project(camera);
+      return {
+        x: (proj.x * 0.5 + 0.5) * w,
+        y: (-proj.y * 0.5 + 0.5) * h,
+        visible: proj.z < 1,
+      };
+    };
+
+    const jit = () => (Math.random() - 0.5) * 80; // tighter scatter — stays near the ship
+    const rSize = () => 100 + Math.random() * 200;
+    const rDur = () => 1.5 + Math.random() * 2.0;
     const anims = ['boom1', 'boom2', 'boom3'];
     const rAnim = () => anims[Math.floor(Math.random() * anims.length)];
 
-    // Immediate blast
-    this.spawnAt(screenX, screenY, 300, 'boom1', 2.5);
+    // Immediate blast — project NOW
+    const pos0 = project();
+    if (pos0.visible) {
+      this.spawnAt(pos0.x, pos0.y, 300, 'boom1', 2.5);
+    }
 
-    // 10 chaotic fireballs at random times, positions, sizes
+    // Delayed fireballs — re-project at spawn time so they track the world point
     for (let i = 0; i < 10; i++) {
       const delay = 50 + Math.random() * 1500;
       setTimeout(() => {
-        this.spawnAt(
-          screenX + jit(),
-          screenY + jit(),
-          rSize(),
-          rAnim(),
-          rDur(),
-        );
+        const pos = project();
+        if (pos.visible) {
+          this.spawnAt(pos.x + jit(), pos.y + jit(), rSize(), rAnim(), rDur());
+        }
+      }, delay);
+    }
+  }
+
+  private spawnDeathAt(screenX: number, screenY: number): void {
+    const jit = () => (Math.random() - 0.5) * 80;
+    const rSize = () => 100 + Math.random() * 200;
+    const rDur = () => 1.5 + Math.random() * 2.0;
+    const anims = ['boom1', 'boom2', 'boom3'];
+    const rAnim = () => anims[Math.floor(Math.random() * anims.length)];
+
+    this.spawnAt(screenX, screenY, 300, 'boom1', 2.5);
+
+    for (let i = 0; i < 10; i++) {
+      const delay = 50 + Math.random() * 1500;
+      setTimeout(() => {
+        this.spawnAt(screenX + jit(), screenY + jit(), rSize(), rAnim(), rDur());
       }, delay);
     }
   }

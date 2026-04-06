@@ -1,7 +1,7 @@
 // ── Procedural Ship Geometry ─────────────────────────────
-// Creates detailed 3D ship models entirely from code.
+// Detailed 3D ship models built from code with PBR materials.
 // Player ship: sleek fighter with swept wings + dual engines.
-// Enemy ship: rounder, menacing with angular wings + single engine.
+// Enemy ship: dark gunmetal with red accent lighting.
 
 import * as THREE from 'three';
 
@@ -9,8 +9,8 @@ import * as THREE from 'three';
 export function createPlayerShipGeometry(): THREE.Group {
   const group = new THREE.Group();
 
-  // ── Fuselage ── compact body
-  const bodyGeo = new THREE.CylinderGeometry(0.8, 0.5, 1.6, 8, 1);
+  // ── Fuselage ── compact body (higher segments for smooth curves)
+  const bodyGeo = new THREE.CylinderGeometry(0.8, 0.5, 1.6, 16, 2);
   bodyGeo.rotateX(Math.PI / 2);
   const fuselage = new THREE.Mesh(bodyGeo);
   fuselage.name = 'fuselage';
@@ -18,7 +18,7 @@ export function createPlayerShipGeometry(): THREE.Group {
   group.add(fuselage);
 
   // ── Nose tip ──
-  const noseGeo = new THREE.ConeGeometry(0.5, 0.4, 8);
+  const noseGeo = new THREE.ConeGeometry(0.5, 0.4, 16);
   noseGeo.rotateX(-Math.PI / 2);
   const nose = new THREE.Mesh(noseGeo);
   nose.name = 'nose';
@@ -26,7 +26,7 @@ export function createPlayerShipGeometry(): THREE.Group {
   group.add(nose);
 
   // ── Cockpit dome ──
-  const cockpitGeo = new THREE.SphereGeometry(0.5, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2);
+  const cockpitGeo = new THREE.SphereGeometry(0.5, 20, 14, 0, Math.PI * 2, 0, Math.PI / 2);
   const cockpit = new THREE.Mesh(cockpitGeo);
   cockpit.name = 'cockpit';
   cockpit.position.set(0, 0.7, 0);
@@ -63,7 +63,7 @@ export function createPlayerShipGeometry(): THREE.Group {
   group.add(rightTip);
 
   // ── Engine nacelles ── two cylinders at rear
-  const engineGeo = new THREE.CylinderGeometry(0.4, 0.5, 2, 8);
+  const engineGeo = new THREE.CylinderGeometry(0.4, 0.5, 2, 16);
   engineGeo.rotateX(Math.PI / 2);
 
   const leftEngine = new THREE.Mesh(engineGeo);
@@ -77,7 +77,7 @@ export function createPlayerShipGeometry(): THREE.Group {
   group.add(rightEngine);
 
   // ── Engine nozzle glow rings ──
-  const nozzleGeo = new THREE.RingGeometry(0.25, 0.5, 12);
+  const nozzleGeo = new THREE.RingGeometry(0.25, 0.5, 20);
   const leftNozzle = new THREE.Mesh(nozzleGeo);
   leftNozzle.name = 'nozzle-left';
   leftNozzle.position.set(-1.2, -0.1, -4.55);
@@ -102,7 +102,7 @@ export function createEnemyShipGeometry(): THREE.Group {
   group.add(fuse);
 
   // ── Nose — tapered front, overlaps fuselage ──
-  const noseGeo = new THREE.ConeGeometry(0.8, 2.0, 4);
+  const noseGeo = new THREE.ConeGeometry(0.8, 2.0, 6);
   noseGeo.rotateX(-Math.PI / 2);
   noseGeo.rotateZ(Math.PI / 4); // diamond profile
   const nose = new THREE.Mesh(noseGeo);
@@ -146,7 +146,7 @@ export function createEnemyShipGeometry(): THREE.Group {
   group.add(rightFin);
 
   // ── Cannon barrels — extend from nose, touching fuselage ──
-  const barrelGeo = new THREE.CylinderGeometry(0.08, 0.08, 1.5, 6);
+  const barrelGeo = new THREE.CylinderGeometry(0.08, 0.08, 1.5, 12);
   barrelGeo.rotateX(-Math.PI / 2);
 
   const leftBarrel = new THREE.Mesh(barrelGeo);
@@ -160,7 +160,7 @@ export function createEnemyShipGeometry(): THREE.Group {
   group.add(rightBarrel);
 
   // ── Engines — outer housing (hull-colored) ──
-  const engineHousingGeo = new THREE.CylinderGeometry(0.5, 0.55, 1.8, 12);
+  const engineHousingGeo = new THREE.CylinderGeometry(0.5, 0.55, 1.8, 20);
   engineHousingGeo.rotateX(Math.PI / 2);
 
   const leftHousing = new THREE.Mesh(engineHousingGeo);
@@ -174,7 +174,7 @@ export function createEnemyShipGeometry(): THREE.Group {
   group.add(rightHousing);
 
   // ── Engine inner core (glowing) ──
-  const engineCoreGeo = new THREE.CylinderGeometry(0.3, 0.4, 1.0, 10);
+  const engineCoreGeo = new THREE.CylinderGeometry(0.3, 0.4, 1.0, 16);
   engineCoreGeo.rotateX(Math.PI / 2);
 
   const leftCore = new THREE.Mesh(engineCoreGeo);
@@ -188,7 +188,7 @@ export function createEnemyShipGeometry(): THREE.Group {
   group.add(rightCore);
 
   // ── Exhaust cones (inside nozzle) ──
-  const exhaustGeo = new THREE.ConeGeometry(0.25, 0.6, 8);
+  const exhaustGeo = new THREE.ConeGeometry(0.25, 0.6, 14);
   exhaustGeo.rotateX(Math.PI / 2);
 
   const leftExhaust = new THREE.Mesh(exhaustGeo);
@@ -202,7 +202,7 @@ export function createEnemyShipGeometry(): THREE.Group {
   group.add(rightExhaust);
 
   // ── Nozzle rings — outer rim ──
-  const nozzleOuterGeo = new THREE.TorusGeometry(0.45, 0.06, 8, 16);
+  const nozzleOuterGeo = new THREE.TorusGeometry(0.45, 0.06, 12, 24);
 
   const leftNozzleOuter = new THREE.Mesh(nozzleOuterGeo);
   leftNozzleOuter.name = 'hull';
@@ -215,7 +215,7 @@ export function createEnemyShipGeometry(): THREE.Group {
   group.add(rightNozzleOuter);
 
   // ── Nozzle glow rings — inner ──
-  const nozzleGeo = new THREE.RingGeometry(0.15, 0.4, 12);
+  const nozzleGeo = new THREE.RingGeometry(0.15, 0.4, 20);
 
   const leftNozzle = new THREE.Mesh(nozzleGeo);
   leftNozzle.name = 'nozzle';
@@ -263,6 +263,71 @@ export function createEnemyShipGeometry(): THREE.Group {
   spine.name = 'hull';
   spine.position.set(0, 0.45, -0.2);
   group.add(spine);
+
+  // ── Red accent strips — glowing edge lighting along hull seams ──
+  const accentStripGeo = new THREE.BoxGeometry(0.05, 0.05, 3.2);
+
+  // Top hull edge strips (left and right of spine)
+  const accentTopL = new THREE.Mesh(accentStripGeo);
+  accentTopL.name = 'accent';
+  accentTopL.position.set(-0.9, 0.36, 0);
+  group.add(accentTopL);
+
+  const accentTopR = new THREE.Mesh(accentStripGeo);
+  accentTopR.name = 'accent';
+  accentTopR.position.set(0.9, 0.36, 0);
+  group.add(accentTopR);
+
+  // Wing root accent strips
+  const wingAccentGeo = new THREE.BoxGeometry(3.5, 0.04, 0.04);
+  const accentWingL = new THREE.Mesh(wingAccentGeo);
+  accentWingL.name = 'accent';
+  accentWingL.position.set(-2.8, 0.07, 0.5);
+  group.add(accentWingL);
+
+  const accentWingR = new THREE.Mesh(wingAccentGeo);
+  accentWingR.name = 'accent';
+  accentWingR.position.set(2.8, 0.07, 0.5);
+  group.add(accentWingR);
+
+  // Engine housing accent rings
+  const accentRingGeo = new THREE.TorusGeometry(0.56, 0.03, 8, 20);
+  const accentRingL = new THREE.Mesh(accentRingGeo);
+  accentRingL.name = 'accent';
+  accentRingL.position.set(-0.7, 0, -1.2);
+  group.add(accentRingL);
+
+  const accentRingR = new THREE.Mesh(accentRingGeo);
+  accentRingR.name = 'accent';
+  accentRingR.position.set(0.7, 0, -1.2);
+  group.add(accentRingR);
+
+  // ── Dark armor panels — contrasting plates on wings and underside ──
+  const armorPanelGeo = new THREE.BoxGeometry(1.8, 0.06, 1.6);
+  const armorUnder = new THREE.Mesh(armorPanelGeo);
+  armorUnder.name = 'armor-dark';
+  armorUnder.position.set(0, -0.38, 0.2);
+  group.add(armorUnder);
+
+  const wingPanelGeo = new THREE.BoxGeometry(1.5, 0.08, 1.0);
+  const armorWingL = new THREE.Mesh(wingPanelGeo);
+  armorWingL.name = 'armor-dark';
+  armorWingL.position.set(-3.2, 0.08, -0.5);
+  group.add(armorWingL);
+
+  const armorWingR = new THREE.Mesh(wingPanelGeo);
+  armorWingR.name = 'armor-dark';
+  armorWingR.position.set(3.2, 0.08, -0.5);
+  group.add(armorWingR);
+
+  // ── Additional red accent point lights for dramatic local illumination ──
+  const accentLight1 = new THREE.PointLight(0xff2200, 2, 15, 2);
+  accentLight1.position.set(0, 0.5, 0.8);
+  group.add(accentLight1);
+
+  const accentLight2 = new THREE.PointLight(0xff2200, 1.5, 12, 2);
+  accentLight2.position.set(0, -0.4, -1.0);
+  group.add(accentLight2);
 
   return group;
 }

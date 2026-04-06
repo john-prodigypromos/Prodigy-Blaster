@@ -3,7 +3,7 @@
 
 import * as THREE from 'three';
 import { createRenderer, handleRendererResize, type RendererBundle } from './renderer/SetupRenderer';
-import { createSpaceEnvironment } from './renderer/Environment';
+import { createSpaceEnvironment, type SpaceEnvironment } from './renderer/Environment';
 import { SceneManager, type SceneState } from './state/SceneManager';
 import { createArenaState, updateArena, cleanupArena, type ArenaState } from './scenes/ArenaLoop';
 import { HUD3D } from './ui/HUD3D';
@@ -13,6 +13,7 @@ import { setCharacter, currentCharacter } from './state/Character';
 import { addHighScore, getHighScores } from './state/HighScores';
 import { currentDifficulty } from './state/Difficulty';
 import { COLORS } from './config';
+import { SoundSystem } from './systems/SoundSystem';
 
 // ── Globals ──
 let bundle: RendererBundle;
@@ -20,6 +21,8 @@ let clock: THREE.Clock;
 let sceneManager: SceneManager;
 let arena: ArenaState | null = null;
 let hud: HUD3D | null = null;
+let spaceEnv: SpaceEnvironment;
+let globalSound: import('./systems/SoundSystem').SoundSystem | null = null;
 const keys: Record<string, boolean> = {};
 
 // ── Overlay elements ──
@@ -35,7 +38,7 @@ function init() {
 
   // ── Renderer + environment ──
   bundle = createRenderer(canvas);
-  createSpaceEnvironment(bundle.scene, bundle.renderer, bundle.camera);
+  spaceEnv = createSpaceEnvironment(bundle.scene, bundle.renderer, bundle.camera);
 
   // Start camera in a cinematic position
   bundle.camera.position.set(0, 10, 30);
@@ -60,6 +63,19 @@ function init() {
     onExit: handleSceneExit,
   });
   sceneManager.start('title');
+
+  // Start music on first click (browser autoplay policy requires user gesture)
+  const startGlobalMusic = () => {
+    if (!globalSound) {
+      globalSound = new SoundSystem();
+      globalSound.init();
+      globalSound.startMusic();
+    }
+    document.removeEventListener('click', startGlobalMusic);
+    document.removeEventListener('touchstart', startGlobalMusic);
+  };
+  document.addEventListener('click', startGlobalMusic);
+  document.addEventListener('touchstart', startGlobalMusic);
 
   animate();
 }
@@ -120,7 +136,7 @@ function createOverlayPanel(cssClass = 'overlay-panel'): HTMLDivElement {
     position:fixed;top:0;left:0;width:100%;height:100%;
     display:flex;flex-direction:column;align-items:center;justify-content:center;
     background:rgba(2,5,8,0.85);z-index:30;
-    font-family:Arial,sans-serif;color:#fff;
+    font-family:Rajdhani,sans-serif;color:#fff;
     pointer-events:auto;overflow-y:auto;padding:20px 16px;
   `;
   overlayEl.appendChild(panel);
@@ -155,7 +171,7 @@ function showTitleOverlay(): void {
     btn.style.cssText = `
       display:block;width:min(360px,85vw);padding:10px 16px;margin:6px 0;
       background:rgba(17,24,34,0.9);border:2px solid ${d.color};
-      color:${d.color};font-size:clamp(14px,3.5vw,18px);font-weight:bold;font-family:Arial,sans-serif;
+      color:${d.color};font-size:clamp(14px,3.5vw,18px);font-weight:bold;font-family:Rajdhani,sans-serif;
       cursor:pointer;border-radius:4px;text-align:center;
     `;
     btn.textContent = d.label;
@@ -218,7 +234,7 @@ function showCharSelectOverlay(): void {
     card.style.cssText = `
       width:min(200px,40vw);padding:12px 16px;background:rgba(17,24,34,0.9);
       border:2px solid #${c.color.toString(16).padStart(6, '0')};
-      color:#fff;font-family:Arial,sans-serif;cursor:pointer;border-radius:6px;
+      color:#fff;font-family:Rajdhani,sans-serif;cursor:pointer;border-radius:6px;
       text-align:center;
     `;
 
@@ -251,10 +267,18 @@ function showCharSelectOverlay(): void {
   panel.appendChild(row);
 }
 
+// Villain intro data — portrait, name, and taunt per level
+const VILLAIN_INTROS = [
+  { name: 'BOLO TIE', portrait: 'bolo-tie.jpg', taunt: 'Wo unto the liar...' },
+  { name: 'BOW TIE', portrait: 'bow-tie.jpg', taunt: 'Are you a thug nasty?' },
+  { name: 'BISHOP', portrait: 'bishop.jpg', taunt: 'I find you deplorable!' },
+];
+
 function showLevelIntroOverlay(): void {
   const panel = createOverlayPanel();
   const level = getCurrentLevel();
 
+  // Level number
   const levelText = document.createElement('div');
   levelText.textContent = `LEVEL ${level.level}`;
   levelText.style.cssText = `
@@ -268,25 +292,82 @@ function showLevelIntroOverlay(): void {
   subtitle.style.cssText = 'font-size:20px;color:#ffcc00;margin-top:12px;letter-spacing:2px;opacity:0;animation:fadeIn 0.5s 0.3s forwards;';
   panel.appendChild(subtitle);
 
-  const enemies = document.createElement('div');
-  enemies.textContent = `${level.enemyCount} ${level.enemyCount === 1 ? 'ENEMY' : 'ENEMIES'}`;
-  enemies.style.cssText = 'font-size:14px;color:#aaa;margin-top:16px;opacity:0;animation:fadeIn 0.5s 0.5s forwards;';
-  panel.appendChild(enemies);
+  const enemyCount = document.createElement('div');
+  enemyCount.textContent = `${level.enemyCount} ${level.enemyCount === 1 ? 'ENEMY' : 'ENEMIES'}`;
+  enemyCount.style.cssText = 'font-size:14px;color:#aaa;margin-top:16px;opacity:0;animation:fadeIn 0.5s 0.5s forwards;';
+  panel.appendChild(enemyCount);
+
+  // ── Villain intro cards — show new enemies for this level ──
+  const villainRow = document.createElement('div');
+  villainRow.style.cssText = 'display:flex;gap:30px;margin-top:30px;opacity:0;animation:fadeIn 0.6s 0.8s forwards;';
+
+  // Show villains up to current level (Level 1 = index 0, Level 2 = 0+1, etc.)
+  for (let i = 0; i < level.level && i < VILLAIN_INTROS.length; i++) {
+    const villain = VILLAIN_INTROS[i];
+    const isNew = i === level.level - 1; // highlight the newest enemy
+
+    const card = document.createElement('div');
+    card.style.cssText = `
+      display:flex;flex-direction:column;align-items:center;
+      padding:16px 20px;background:rgba(40,10,10,${isNew ? '0.8' : '0.4'});
+      border:2px solid ${isNew ? '#ff4444' : '#662222'};border-radius:8px;
+      ${isNew ? 'animation:villainPulse 1.5s ease-in-out infinite alternate;' : ''}
+    `;
+
+    // Portrait
+    const img = document.createElement('img');
+    img.src = `/portraits/${villain.portrait}`;
+    img.style.cssText = `
+      width:clamp(70px,18vw,120px);height:clamp(70px,18vw,120px);border-radius:50%;object-fit:cover;
+      border:3px solid ${isNew ? '#ff4444' : '#662222'};margin-bottom:10px;
+      ${isNew ? 'filter:drop-shadow(0 0 12px rgba(255,50,0,0.5));' : ''}
+    `;
+    card.appendChild(img);
+
+    // Name
+    const name = document.createElement('div');
+    name.textContent = villain.name;
+    name.style.cssText = `
+      font-size:18px;font-weight:bold;color:${isNew ? '#ff4444' : '#884444'};
+      letter-spacing:2px;margin-bottom:6px;
+      ${isNew ? 'text-shadow:0 0 10px rgba(255,50,0,0.4);' : ''}
+    `;
+    card.appendChild(name);
+
+    // Taunt — only show for the new enemy
+    if (isNew) {
+      const taunt = document.createElement('div');
+      taunt.textContent = `"${villain.taunt}"`;
+      taunt.style.cssText = `
+        font-size:14px;color:#ff8866;font-style:italic;
+        max-width:200px;text-align:center;line-height:1.3;
+      `;
+      card.appendChild(taunt);
+    }
+
+    villainRow.appendChild(card);
+  }
+
+  panel.appendChild(villainRow);
 
   // Inject animations
-  const style = document.createElement('style');
-  style.textContent = `
-    @keyframes scaleIn { from { transform:scale(0.3);opacity:0; } to { transform:scale(1);opacity:1; } }
-    @keyframes fadeIn { from { opacity:0; } to { opacity:1; } }
-  `;
-  document.head.appendChild(style);
+  if (!document.getElementById('level-intro-css')) {
+    const style = document.createElement('style');
+    style.id = 'level-intro-css';
+    style.textContent = `
+      @keyframes scaleIn { from { transform:scale(0.3);opacity:0; } to { transform:scale(1);opacity:1; } }
+      @keyframes fadeIn { from { opacity:0; } to { opacity:1; } }
+      @keyframes villainPulse { from { border-color:#ff4444;box-shadow:0 0 15px rgba(255,50,0,0.3); } to { border-color:#ff6644;box-shadow:0 0 30px rgba(255,50,0,0.5); } }
+    `;
+    document.head.appendChild(style);
+  }
 
-  // Auto-advance after 2.5s
+  // Longer delay to let players read the villain intro — 4.5s
   setTimeout(() => {
     if (sceneManager.current === 'levelIntro') {
       sceneManager.transition('arena');
     }
-  }, 2500);
+  }, 4500);
 }
 
 function startArena(): void {
@@ -350,7 +431,7 @@ function showHighScoreOverlay(): void {
 
   // Play yay sound
   if (arena?.sound) {
-    arena.sound.yay();
+    // sound.yay() removed — music carries the emotion
   }
 
   // Name entry
@@ -362,10 +443,10 @@ function showHighScoreOverlay(): void {
   const nameInput = document.createElement('input');
   nameInput.type = 'text';
   nameInput.maxLength = 12;
-  nameInput.value = 'PILOT';
+  nameInput.placeholder = 'YOUR NAME';
   nameInput.style.cssText = `
     width:200px;padding:10px;background:rgba(17,24,34,0.9);
-    border:2px solid #ffcc00;color:#fff;font-size:18px;font-family:Arial,sans-serif;
+    border:2px solid #ffcc00;color:#fff;font-size:18px;font-family:Rajdhani,sans-serif;
     text-align:center;border-radius:4px;outline:none;
   `;
   nameInput.addEventListener('input', () => {
@@ -373,15 +454,8 @@ function showHighScoreOverlay(): void {
   });
   panel.appendChild(nameInput);
 
-  const submitBtn = document.createElement('button');
-  submitBtn.textContent = 'SAVE SCORE';
-  submitBtn.style.cssText = `
-    margin-top:16px;padding:12px 32px;background:#ffcc00;color:#000;
-    font-size:16px;font-weight:bold;border:none;border-radius:4px;
-    cursor:pointer;font-family:Arial,sans-serif;
-  `;
-  submitBtn.addEventListener('click', () => {
-    const name = nameInput.value.trim() || 'PILOT';
+  const submitScore = () => {
+    const name = nameInput.value.trim() || 'ANON';
     addHighScore({
       name,
       score: finalScore,
@@ -390,7 +464,21 @@ function showHighScoreOverlay(): void {
       date: new Date().toISOString(),
     });
     sceneManager.transition('title');
+  };
+
+  // Submit on Enter/Return key
+  nameInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') submitScore();
   });
+
+  const submitBtn = document.createElement('button');
+  submitBtn.textContent = 'SAVE SCORE';
+  submitBtn.style.cssText = `
+    margin-top:16px;padding:12px 32px;background:#ffcc00;color:#000;
+    font-size:16px;font-weight:bold;border:none;border-radius:4px;
+    cursor:pointer;font-family:Rajdhani,sans-serif;
+  `;
+  submitBtn.addEventListener('click', submitScore);
   panel.appendChild(submitBtn);
 
   setTimeout(() => nameInput.focus(), 100);
@@ -399,9 +487,11 @@ function showHighScoreOverlay(): void {
 function showGameOverOverlay(): void {
   const panel = createOverlayPanel();
 
-  // Villain portrait — big, menacing, centered
+  // Villain portrait — show the enemy from the current level
+  const enemyPortraits = ['bolo-tie.jpg', 'bow-tie.jpg', 'bishop.jpg'];
+  const villainFile = enemyPortraits[Math.min(currentLevelIndex, enemyPortraits.length - 1)];
   const villainImg = document.createElement('img');
-  villainImg.src = '/portraits/villain.jpg';
+  villainImg.src = `/portraits/${villainFile}`;
   villainImg.alt = 'Villain';
   villainImg.style.cssText = `
     width:clamp(100px,22vw,180px);height:clamp(100px,22vw,180px);border-radius:50%;object-fit:cover;
@@ -433,7 +523,7 @@ function showGameOverOverlay(): void {
   retryBtn.textContent = 'PLAY AGAIN';
   retryBtn.style.cssText = `
     padding:14px 40px;background:rgba(17,24,34,0.9);border:2px solid #ff4444;
-    color:#ff4444;font-size:18px;font-weight:bold;font-family:Arial,sans-serif;
+    color:#ff4444;font-size:18px;font-weight:bold;font-family:Rajdhani,sans-serif;
     cursor:pointer;border-radius:4px;
   `;
   retryBtn.addEventListener('click', () => {
@@ -450,7 +540,7 @@ function showGameOverOverlay(): void {
 
   // Play evil laugh sound
   if (arena?.sound) {
-    arena.sound.evilLaugh();
+    // sound.evilLaugh() removed
   }
 }
 
@@ -492,6 +582,12 @@ function animate() {
     const t = clock.elapsedTime * 0.1;
     bundle.camera.position.set(Math.sin(t) * 30, 10, Math.cos(t) * 30);
     bundle.camera.lookAt(0, 0, 0);
+  }
+
+  // Slow planet/moon rotation for realism
+  if (spaceEnv) {
+    spaceEnv.planet.rotation.y += dt * 0.02;
+    spaceEnv.moon.rotation.y += dt * 0.05;
   }
 
   bundle.composer.render();

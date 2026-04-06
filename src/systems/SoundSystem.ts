@@ -177,74 +177,93 @@ export class SoundSystem {
     sub.stop(now + 0.15);
   }
 
-  // ── Big explosion: massive bass boom ──
+  // ── Big explosion: cinematic multi-layered boom with sustained decay ──
   explosion(): void {
     const ctx = this.ensureCtx();
     if (!ctx || !this.masterGain) return;
     const now = ctx.currentTime;
 
-    // Filtered noise (rumble, not hiss)
-    const bufferSize = ctx.sampleRate * 0.8;
-    const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
-    const data = buffer.getChannelData(0);
-    for (let i = 0; i < bufferSize; i++) {
-      data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / bufferSize, 1.5);
+    // Layer 1: Initial transient crack — sharp attack, short noise burst
+    const crackSize = ctx.sampleRate * 0.05;
+    const crackBuf = ctx.createBuffer(1, crackSize, ctx.sampleRate);
+    const crackData = crackBuf.getChannelData(0);
+    for (let i = 0; i < crackSize; i++) {
+      crackData[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / crackSize, 3);
     }
-    const noise = ctx.createBufferSource();
-    noise.buffer = buffer;
+    const crack = ctx.createBufferSource();
+    crack.buffer = crackBuf;
+    const crackGain = ctx.createGain();
+    const crackFilter = this.lpf(ctx, 2000);
+    crackGain.gain.setValueAtTime(0.4, now);
+    crackGain.gain.exponentialRampToValueAtTime(0.001, now + 0.06);
+    crack.connect(crackFilter);
+    crackFilter.connect(crackGain);
+    crackGain.connect(this.masterGain);
+    crack.start(now);
 
-    const noiseFilter = this.lpf(ctx, 400);
-    noiseFilter.frequency.setValueAtTime(400, now);
-    noiseFilter.frequency.exponentialRampToValueAtTime(80, now + 0.6);
-    const noiseGain = ctx.createGain();
-    noiseGain.gain.setValueAtTime(0.3, now);
-    noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.8);
-    noise.connect(noiseFilter);
-    noiseFilter.connect(noiseGain);
-    noiseGain.connect(this.masterGain);
-    noise.start(now);
-
-    // Massive sub-bass drop
+    // Layer 2: Heavy bass thud — the "boom" body
     const sub = ctx.createOscillator();
     const subGain = ctx.createGain();
     sub.type = 'sine';
-    sub.frequency.setValueAtTime(60, now);
-    sub.frequency.exponentialRampToValueAtTime(15, now + 0.6);
-    subGain.gain.setValueAtTime(0.5, now);
-    subGain.gain.exponentialRampToValueAtTime(0.001, now + 0.6);
+    sub.frequency.setValueAtTime(80, now);
+    sub.frequency.exponentialRampToValueAtTime(12, now + 1.0);
+    subGain.gain.setValueAtTime(0.6, now);
+    subGain.gain.setValueAtTime(0.5, now + 0.05);
+    subGain.gain.exponentialRampToValueAtTime(0.001, now + 1.0);
     sub.connect(subGain);
     subGain.connect(this.masterGain);
     sub.start(now);
-    sub.stop(now + 0.6);
+    sub.stop(now + 1.0);
 
-    // Mid-bass body
+    // Layer 3: Rumbling debris noise — long, filtered, decaying
+    const rumbleSize = ctx.sampleRate * 1.5;
+    const rumbleBuf = ctx.createBuffer(1, rumbleSize, ctx.sampleRate);
+    const rumbleData = rumbleBuf.getChannelData(0);
+    for (let i = 0; i < rumbleSize; i++) {
+      rumbleData[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / rumbleSize, 2);
+    }
+    const rumble = ctx.createBufferSource();
+    rumble.buffer = rumbleBuf;
+    const rumbleFilter = this.lpf(ctx, 500);
+    rumbleFilter.frequency.setValueAtTime(500, now);
+    rumbleFilter.frequency.exponentialRampToValueAtTime(60, now + 1.2);
+    const rumbleGain = ctx.createGain();
+    rumbleGain.gain.setValueAtTime(0.001, now);
+    rumbleGain.gain.linearRampToValueAtTime(0.3, now + 0.02);
+    rumbleGain.gain.exponentialRampToValueAtTime(0.001, now + 1.5);
+    rumble.connect(rumbleFilter);
+    rumbleFilter.connect(rumbleGain);
+    rumbleGain.connect(this.masterGain);
+    rumble.start(now);
+
+    // Layer 4: Mid-frequency growl — adds texture between bass and noise
     const mid = ctx.createOscillator();
     const midGain = ctx.createGain();
-    const midFilter = this.lpf(ctx, 300);
+    const midFilter = this.lpf(ctx, 400);
     mid.type = 'sawtooth';
-    mid.frequency.setValueAtTime(120, now);
-    mid.frequency.exponentialRampToValueAtTime(30, now + 0.4);
-    midGain.gain.setValueAtTime(0.25, now);
-    midGain.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
+    mid.frequency.setValueAtTime(150, now);
+    mid.frequency.exponentialRampToValueAtTime(25, now + 0.7);
+    midGain.gain.setValueAtTime(0.2, now);
+    midGain.gain.exponentialRampToValueAtTime(0.001, now + 0.7);
     mid.connect(midFilter);
     midFilter.connect(midGain);
     midGain.connect(this.masterGain);
     mid.start(now);
-    mid.stop(now + 0.4);
+    mid.stop(now + 0.7);
 
-    // Second sub hit (slightly delayed for "double thump")
+    // Layer 5: Secondary delayed thump — "echo" of the explosion
     const sub2 = ctx.createOscillator();
     const sub2Gain = ctx.createGain();
     sub2.type = 'sine';
-    sub2.frequency.setValueAtTime(40, now + 0.05);
-    sub2.frequency.exponentialRampToValueAtTime(12, now + 0.5);
+    sub2.frequency.setValueAtTime(50, now + 0.08);
+    sub2.frequency.exponentialRampToValueAtTime(10, now + 0.8);
     sub2Gain.gain.setValueAtTime(0.001, now);
-    sub2Gain.gain.linearRampToValueAtTime(0.4, now + 0.05);
-    sub2Gain.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
+    sub2Gain.gain.linearRampToValueAtTime(0.35, now + 0.1);
+    sub2Gain.gain.exponentialRampToValueAtTime(0.001, now + 0.8);
     sub2.connect(sub2Gain);
     sub2Gain.connect(this.masterGain);
     sub2.start(now);
-    sub2.stop(now + 0.5);
+    sub2.stop(now + 0.8);
   }
 
   // ── Wall bounce: short bass thunk ──
@@ -343,10 +362,11 @@ export class SoundSystem {
     this.thrusting = false;
   }
 
-  // ── Background Music: retro chiptune loop ──
+  // ── Background Music: real audio file playback ──
   private musicPlaying = false;
-  private musicTimer: ReturnType<typeof setInterval> | null = null;
-  private musicNodes: (OscillatorNode | GainNode | BiquadFilterNode)[] = [];
+  private musicElement: HTMLAudioElement | null = null;
+  private musicGainNode: GainNode | null = null;
+  private musicSource: MediaElementAudioSourceNode | null = null;
 
   startMusic(): void {
     if (this.musicPlaying) return;
@@ -354,102 +374,29 @@ export class SoundSystem {
     if (!ctx || !this.masterGain) return;
     this.musicPlaying = true;
 
-    // Music gain — audible but not overpowering SFX
-    const musicGain = ctx.createGain();
-    musicGain.gain.value = 0.25;
-    musicGain.connect(this.masterGain);
-    this.musicNodes.push(musicGain);
+    // Create audio element for the battle soundtrack
+    this.musicElement = new Audio('/audio/cyberpunk_battle.ogg');
+    this.musicElement.loop = true;
+    this.musicElement.volume = 1.0;
 
-    const bpm = 140;
-    const stepTime = 60 / bpm / 2; // 16th notes
+    // Route through Web Audio API for gain control
+    this.musicSource = ctx.createMediaElementSource(this.musicElement);
+    this.musicGainNode = ctx.createGain();
+    this.musicGainNode.gain.value = 0.35; // background level — doesn't overpower SFX
+    this.musicSource.connect(this.musicGainNode);
+    this.musicGainNode.connect(this.masterGain);
 
-    // ── Bass line (square wave, deep) ──
-    //    Am - F - C - G progression, 2 bars loop
-    const bassNotes = [
-      110, 110, 0, 110, 87, 87, 0, 87,      // Am, F
-      131, 131, 0, 131, 98, 98, 0, 98,       // C, G
-      110, 110, 0, 110, 87, 87, 0, 87,       // Am, F
-      131, 131, 0, 131, 98, 0, 110, 0,       // C, G (variation)
-    ];
-
-    // ── Lead melody (triangle wave) ──
-    const leadNotes = [
-      330, 0, 392, 440, 0, 392, 330, 0,      // E4, G4, A4 motif
-      349, 0, 330, 262, 0, 294, 330, 0,      // F4, E4, C4, D4
-      330, 0, 392, 440, 0, 523, 440, 392,    // ascending run
-      349, 330, 0, 294, 262, 0, 0, 0,        // descending resolve
-    ];
-
-    // ── Arpeggio (pulse wave feel via detuned square) ──
-    const arpNotes = [
-      220, 262, 330, 262, 175, 220, 262, 220,
-      262, 330, 392, 330, 196, 247, 294, 247,
-      220, 262, 330, 262, 175, 220, 262, 220,
-      262, 330, 392, 330, 196, 247, 294, 0,
-    ];
-
-    let step = 0;
-    const totalSteps = bassNotes.length;
-
-    const playStep = () => {
-      if (!this.musicPlaying || !this.ctx) return;
-      const now = this.ctx.currentTime;
-      const i = step % totalSteps;
-
-      // Bass
-      if (bassNotes[i] > 0) {
-        const osc = ctx.createOscillator();
-        const g = ctx.createGain();
-        const f = this.lpf(ctx, 350);
-        osc.type = 'square';
-        osc.frequency.value = bassNotes[i] / 2; // one octave lower
-        g.gain.setValueAtTime(0.3, now);
-        g.gain.exponentialRampToValueAtTime(0.001, now + stepTime * 0.9);
-        osc.connect(f);
-        f.connect(g);
-        g.connect(musicGain);
-        osc.start(now);
-        osc.stop(now + stepTime * 0.9);
-      }
-
-      // Lead
-      if (leadNotes[i] > 0) {
-        const osc = ctx.createOscillator();
-        const g = ctx.createGain();
-        const f = this.lpf(ctx, 1200);
-        osc.type = 'triangle';
-        osc.frequency.value = leadNotes[i];
-        g.gain.setValueAtTime(0.2, now);
-        g.gain.exponentialRampToValueAtTime(0.001, now + stepTime * 0.85);
-        osc.connect(f);
-        f.connect(g);
-        g.connect(musicGain);
-        osc.start(now);
-        osc.stop(now + stepTime * 0.85);
-      }
-
-      // Arpeggio
-      if (arpNotes[i] > 0) {
-        const osc = ctx.createOscillator();
-        const g = ctx.createGain();
-        const f = this.lpf(ctx, 900);
-        osc.type = 'square';
-        osc.frequency.value = arpNotes[i];
-        g.gain.setValueAtTime(0.08, now);
-        g.gain.exponentialRampToValueAtTime(0.001, now + stepTime * 0.6);
-        osc.connect(f);
-        f.connect(g);
-        g.connect(musicGain);
-        osc.start(now);
-        osc.stop(now + stepTime * 0.6);
-      }
-
-      step++;
-    };
-
-    // Schedule steps via setInterval (simple, works well for chiptune)
-    playStep();
-    this.musicTimer = setInterval(playStep, stepTime * 1000);
+    // Start playback (may need user gesture — handled by init() timing)
+    this.musicElement.play().catch(() => {
+      // Autoplay blocked — will start on next user interaction
+      const startOnInteract = () => {
+        this.musicElement?.play();
+        document.removeEventListener('click', startOnInteract);
+        document.removeEventListener('touchstart', startOnInteract);
+      };
+      document.addEventListener('click', startOnInteract);
+      document.addEventListener('touchstart', startOnInteract);
+    });
   }
 
   isMusicPlaying(): boolean {
@@ -458,251 +405,287 @@ export class SoundSystem {
 
   stopMusic(): void {
     this.musicPlaying = false;
-    if (this.musicTimer) {
-      clearInterval(this.musicTimer);
-      this.musicTimer = null;
+    if (this.musicElement) {
+      // Fade out over 0.5s
+      if (this.musicGainNode && this.ctx) {
+        const now = this.ctx.currentTime;
+        this.musicGainNode.gain.setValueAtTime(this.musicGainNode.gain.value, now);
+        this.musicGainNode.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
+        setTimeout(() => {
+          this.musicElement?.pause();
+          this.musicElement = null;
+          this.musicSource = null;
+          this.musicGainNode = null;
+        }, 600);
+      } else {
+        this.musicElement.pause();
+        this.musicElement = null;
+      }
     }
-    // Clean up any lingering gain nodes
-    this.musicNodes = [];
   }
 
-  // ── "YAY!" — loud bright 3-note celebration chirp ──
+  // ── "YAY!" — triumphant cinematic brass-style stab ──
   yay(): void {
     const ctx = this.ensureCtx();
     if (!ctx || !this.masterGain) return;
     const now = ctx.currentTime;
 
-    // Three bright ascending chirps: "Ya-Ya-YAY!"
-    const chirps = [
-      { freq: 523, time: 0, dur: 0.12 },      // C5
-      { freq: 659, time: 0.15, dur: 0.12 },    // E5
-      { freq: 880, time: 0.30, dur: 0.35 },    // A5 (held longer)
-    ];
-
-    for (const chirp of chirps) {
-      const t = now + chirp.time;
-
-      // Main bright tone
+    // Big orchestral-style chord hit with sustain
+    const chordFreqs = [262, 330, 392, 523]; // C major spread: C4, E4, G4, C5
+    for (const freq of chordFreqs) {
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
-      osc.type = 'square';
-      osc.frequency.setValueAtTime(chirp.freq, t);
-      osc.frequency.exponentialRampToValueAtTime(chirp.freq * 1.05, t + chirp.dur * 0.5);
-      gain.gain.setValueAtTime(0, t);
-      gain.gain.linearRampToValueAtTime(0.4, t + 0.015);
-      gain.gain.setValueAtTime(0.4, t + chirp.dur * 0.6);
-      gain.gain.exponentialRampToValueAtTime(0.001, t + chirp.dur);
-      osc.connect(gain);
-      gain.connect(this.masterGain);
-      osc.start(t);
-      osc.stop(t + chirp.dur);
-
-      // Octave below for body
-      const sub = ctx.createOscillator();
-      const subGain = ctx.createGain();
-      sub.type = 'triangle';
-      sub.frequency.value = chirp.freq / 2;
-      subGain.gain.setValueAtTime(0, t);
-      subGain.gain.linearRampToValueAtTime(0.3, t + 0.015);
-      subGain.gain.exponentialRampToValueAtTime(0.001, t + chirp.dur);
-      sub.connect(subGain);
-      subGain.connect(this.masterGain);
-      sub.start(t);
-      sub.stop(t + chirp.dur);
+      const filter = this.lpf(ctx, 2500);
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(freq, now);
+      gain.gain.setValueAtTime(0, now);
+      gain.gain.linearRampToValueAtTime(0.15, now + 0.03);
+      gain.gain.setValueAtTime(0.12, now + 0.3);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 1.0);
+      osc.connect(filter);
+      filter.connect(gain);
+      gain.connect(this.masterGain!);
+      osc.start(now);
+      osc.stop(now + 1.0);
     }
+
+    // Sub bass foundation
+    const sub = ctx.createOscillator();
+    const subGain = ctx.createGain();
+    sub.type = 'sine';
+    sub.frequency.value = 131; // C3
+    subGain.gain.setValueAtTime(0, now);
+    subGain.gain.linearRampToValueAtTime(0.3, now + 0.02);
+    subGain.gain.exponentialRampToValueAtTime(0.001, now + 0.8);
+    sub.connect(subGain);
+    subGain.connect(this.masterGain!);
+    sub.start(now);
+    sub.stop(now + 0.8);
+
+    // Bright shimmer layer
+    const shimmer = ctx.createOscillator();
+    const shimmerGain = ctx.createGain();
+    shimmer.type = 'sine';
+    shimmer.frequency.value = 1047; // C6
+    shimmerGain.gain.setValueAtTime(0, now + 0.05);
+    shimmerGain.gain.linearRampToValueAtTime(0.06, now + 0.1);
+    shimmerGain.gain.exponentialRampToValueAtTime(0.001, now + 1.2);
+    shimmer.connect(shimmerGain);
+    shimmerGain.connect(this.masterGain!);
+    shimmer.start(now + 0.05);
+    shimmer.stop(now + 1.2);
   }
 
-  // ── Victory: deep warm ascending tones ──
+  // ── Victory: epic ascending power chord fanfare ──
   victory(): void {
     const ctx = this.ensureCtx();
     if (!ctx || !this.masterGain) return;
     const now = ctx.currentTime;
 
-    const notes = [131, 165, 196, 262]; // C3, E3, G3, C4 — low register
-    notes.forEach((freq, i) => {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      const filter = this.lpf(ctx, 800);
-      osc.type = 'triangle';
-      const t = now + i * 0.2;
-      osc.frequency.setValueAtTime(freq, t);
-      gain.gain.setValueAtTime(0, t);
-      gain.gain.linearRampToValueAtTime(0.2, t + 0.05);
-      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.5);
-      osc.connect(filter);
-      filter.connect(gain);
-      gain.connect(this.masterGain!);
-      osc.start(t);
-      osc.stop(t + 0.5);
+    // Three ascending power chords with reverb-like decay
+    const chords = [
+      { time: 0, notes: [131, 196, 262], dur: 0.8 },      // C power chord
+      { time: 0.35, notes: [165, 247, 330], dur: 0.8 },    // E power chord
+      { time: 0.7, notes: [196, 294, 392, 523], dur: 1.5 }, // G major → sustain
+    ];
 
-      // Sub octave doubling
+    for (const chord of chords) {
+      const t = now + chord.time;
+      for (const freq of chord.notes) {
+        // Rich sawtooth for "brass" feel
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        const filter = this.lpf(ctx, 2000);
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(freq, t);
+        gain.gain.setValueAtTime(0, t);
+        gain.gain.linearRampToValueAtTime(0.12, t + 0.04);
+        gain.gain.setValueAtTime(0.1, t + chord.dur * 0.4);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + chord.dur);
+        osc.connect(filter);
+        filter.connect(gain);
+        gain.connect(this.masterGain!);
+        osc.start(t);
+        osc.stop(t + chord.dur);
+
+        // Detuned layer for thickness
+        const osc2 = ctx.createOscillator();
+        const gain2 = ctx.createGain();
+        osc2.type = 'sawtooth';
+        osc2.frequency.setValueAtTime(freq * 1.003, t); // slight detune
+        gain2.gain.setValueAtTime(0, t);
+        gain2.gain.linearRampToValueAtTime(0.06, t + 0.04);
+        gain2.gain.exponentialRampToValueAtTime(0.001, t + chord.dur);
+        osc2.connect(filter);
+        filter.connect(gain2);
+        gain2.connect(this.masterGain!);
+        osc2.start(t);
+        osc2.stop(t + chord.dur);
+      }
+
+      // Sub bass hit per chord
       const sub = ctx.createOscillator();
       const subGain = ctx.createGain();
       sub.type = 'sine';
-      sub.frequency.setValueAtTime(freq / 2, t);
+      sub.frequency.value = chord.notes[0] / 2;
       subGain.gain.setValueAtTime(0, t);
-      subGain.gain.linearRampToValueAtTime(0.15, t + 0.05);
-      subGain.gain.exponentialRampToValueAtTime(0.001, t + 0.5);
+      subGain.gain.linearRampToValueAtTime(0.25, t + 0.03);
+      subGain.gain.exponentialRampToValueAtTime(0.001, t + chord.dur * 0.8);
       sub.connect(subGain);
       subGain.connect(this.masterGain!);
       sub.start(t);
-      sub.stop(t + 0.5);
-    });
+      sub.stop(t + chord.dur);
+    }
   }
 
-  // ── Evil laugh: sinister "ha ha ha ha" ──
+  // ── Evil laugh: deep menacing descending growl with distortion ──
   evilLaugh(): void {
     const ctx = this.ensureCtx();
     if (!ctx || !this.masterGain) return;
     const now = ctx.currentTime;
 
-    // Each "ha" is a quick pitch drop with a growly tone
-    const haTimings = [0, 0.22, 0.42, 0.58, 0.72, 0.9, 1.1];
-    const basePitch = [180, 170, 190, 165, 185, 160, 140];
+    // Sinister descending tone — like a dark synth stab
+    const stabs = [
+      { time: 0, freq: 200, dur: 0.25 },
+      { time: 0.3, freq: 180, dur: 0.2 },
+      { time: 0.55, freq: 160, dur: 0.2 },
+      { time: 0.8, freq: 120, dur: 0.35 },
+      { time: 1.2, freq: 80, dur: 0.5 },
+    ];
 
-    haTimings.forEach((offset, i) => {
-      const t = now + offset;
-      const pitch = basePitch[i];
+    for (const stab of stabs) {
+      const t = now + stab.time;
 
-      // Main growl tone
+      // Heavy distorted sawtooth
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
-      const filter = this.lpf(ctx, 500);
+      const filter = this.lpf(ctx, 600);
+      // Waveshaper for distortion
+      const distortion = ctx.createWaveShaper();
+      const curve = new Float32Array(256);
+      for (let i = 0; i < 256; i++) {
+        const x = (i / 128) - 1;
+        curve[i] = Math.tanh(x * 3);
+      }
+      distortion.curve = curve;
+
       osc.type = 'sawtooth';
-      osc.frequency.setValueAtTime(pitch, t);
-      osc.frequency.exponentialRampToValueAtTime(pitch * 0.6, t + 0.15);
+      osc.frequency.setValueAtTime(stab.freq, t);
+      osc.frequency.exponentialRampToValueAtTime(stab.freq * 0.5, t + stab.dur);
       gain.gain.setValueAtTime(0, t);
-      gain.gain.linearRampToValueAtTime(0.18, t + 0.02);
-      gain.gain.setValueAtTime(0.18, t + 0.05);
-      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.18);
-      osc.connect(filter);
+      gain.gain.linearRampToValueAtTime(0.2, t + 0.02);
+      gain.gain.setValueAtTime(0.18, t + stab.dur * 0.3);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + stab.dur);
+      osc.connect(distortion);
+      distortion.connect(filter);
       filter.connect(gain);
       gain.connect(this.masterGain!);
       osc.start(t);
-      osc.stop(t + 0.18);
+      osc.stop(t + stab.dur);
 
-      // Deep sub "body" of each ha
+      // Sub rumble under each stab
       const sub = ctx.createOscillator();
       const subGain = ctx.createGain();
       sub.type = 'sine';
-      sub.frequency.setValueAtTime(pitch / 2, t);
-      sub.frequency.exponentialRampToValueAtTime(pitch * 0.25, t + 0.15);
+      sub.frequency.setValueAtTime(stab.freq / 2, t);
+      sub.frequency.exponentialRampToValueAtTime(stab.freq * 0.2, t + stab.dur);
       subGain.gain.setValueAtTime(0, t);
-      subGain.gain.linearRampToValueAtTime(0.25, t + 0.02);
-      subGain.gain.exponentialRampToValueAtTime(0.001, t + 0.16);
+      subGain.gain.linearRampToValueAtTime(0.3, t + 0.02);
+      subGain.gain.exponentialRampToValueAtTime(0.001, t + stab.dur);
       sub.connect(subGain);
       subGain.connect(this.masterGain!);
       sub.start(t);
-      sub.stop(t + 0.16);
-    });
+      sub.stop(t + stab.dur);
+    }
 
-    // Trailing low rumble after the laugh
-    const rumble = ctx.createOscillator();
-    const rumbleGain = ctx.createGain();
-    const rumbleFilter = this.lpf(ctx, 200);
-    rumble.type = 'sawtooth';
-    rumble.frequency.setValueAtTime(50, now + 1.2);
-    rumble.frequency.exponentialRampToValueAtTime(20, now + 2.0);
-    rumbleGain.gain.setValueAtTime(0, now + 1.2);
-    rumbleGain.gain.linearRampToValueAtTime(0.1, now + 1.3);
-    rumbleGain.gain.exponentialRampToValueAtTime(0.001, now + 2.0);
-    rumble.connect(rumbleFilter);
-    rumbleFilter.connect(rumbleGain);
-    rumbleGain.connect(this.masterGain!);
-    rumble.start(now + 1.2);
-    rumble.stop(now + 2.0);
+    // Long trailing bass drone — ominous
+    const drone = ctx.createOscillator();
+    const droneGain = ctx.createGain();
+    const droneFilter = this.lpf(ctx, 150);
+    drone.type = 'sawtooth';
+    drone.frequency.setValueAtTime(40, now + 1.5);
+    drone.frequency.exponentialRampToValueAtTime(18, now + 3.0);
+    droneGain.gain.setValueAtTime(0, now + 1.5);
+    droneGain.gain.linearRampToValueAtTime(0.15, now + 1.7);
+    droneGain.gain.exponentialRampToValueAtTime(0.001, now + 3.0);
+    drone.connect(droneFilter);
+    droneFilter.connect(droneGain);
+    droneGain.connect(this.masterGain!);
+    drone.start(now + 1.5);
+    drone.stop(now + 3.0);
   }
 
-  // ── Level start: two ascending bass notes ──
+  // ── Level start: cinematic bass drop + sweep ──
   levelStart(): void {
     const ctx = this.ensureCtx();
     if (!ctx || !this.masterGain) return;
     const now = ctx.currentTime;
 
-    const notes = [131, 196]; // C3, G3
-    notes.forEach((freq, i) => {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      const filter = this.lpf(ctx, 700);
-      osc.type = 'triangle';
-      const t = now + i * 0.15;
-      osc.frequency.setValueAtTime(freq, t);
-      gain.gain.setValueAtTime(0, t);
-      gain.gain.linearRampToValueAtTime(0.2, t + 0.04);
-      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.4);
-      osc.connect(filter);
-      filter.connect(gain);
-      gain.connect(this.masterGain!);
-      osc.start(t);
-      osc.stop(t + 0.4);
+    // Rising sweep
+    const sweep = ctx.createOscillator();
+    const sweepGain = ctx.createGain();
+    const sweepFilter = this.lpf(ctx, 1500);
+    sweep.type = 'sawtooth';
+    sweep.frequency.setValueAtTime(60, now);
+    sweep.frequency.exponentialRampToValueAtTime(400, now + 0.4);
+    sweepGain.gain.setValueAtTime(0.15, now);
+    sweepGain.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
+    sweep.connect(sweepFilter);
+    sweepFilter.connect(sweepGain);
+    sweepGain.connect(this.masterGain!);
+    sweep.start(now);
+    sweep.stop(now + 0.5);
 
-      const sub = ctx.createOscillator();
-      const subGain = ctx.createGain();
-      sub.type = 'sine';
-      sub.frequency.setValueAtTime(freq / 2, t);
-      subGain.gain.setValueAtTime(0, t);
-      subGain.gain.linearRampToValueAtTime(0.15, t + 0.04);
-      subGain.gain.exponentialRampToValueAtTime(0.001, t + 0.4);
-      sub.connect(subGain);
-      subGain.connect(this.masterGain!);
-      sub.start(t);
-      sub.stop(t + 0.4);
-    });
+    // Impact hit at the peak
+    const hit = ctx.createOscillator();
+    const hitGain = ctx.createGain();
+    hit.type = 'sine';
+    hit.frequency.setValueAtTime(100, now + 0.35);
+    hit.frequency.exponentialRampToValueAtTime(30, now + 0.8);
+    hitGain.gain.setValueAtTime(0, now + 0.33);
+    hitGain.gain.linearRampToValueAtTime(0.4, now + 0.36);
+    hitGain.gain.exponentialRampToValueAtTime(0.001, now + 0.8);
+    hit.connect(hitGain);
+    hitGain.connect(this.masterGain!);
+    hit.start(now + 0.33);
+    hit.stop(now + 0.8);
+
+    // Noise transient at impact
+    const noiseSize = ctx.sampleRate * 0.08;
+    const noiseBuf = ctx.createBuffer(1, noiseSize, ctx.sampleRate);
+    const noiseData = noiseBuf.getChannelData(0);
+    for (let i = 0; i < noiseSize; i++) {
+      noiseData[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / noiseSize, 4);
+    }
+    const noise = ctx.createBufferSource();
+    noise.buffer = noiseBuf;
+    const noiseGain = ctx.createGain();
+    const noiseFilter = this.lpf(ctx, 1000);
+    noiseGain.gain.setValueAtTime(0.2, now + 0.35);
+    noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.45);
+    noise.connect(noiseFilter);
+    noiseFilter.connect(noiseGain);
+    noiseGain.connect(this.masterGain!);
+    noise.start(now + 0.35);
   }
 
-  // ── Level complete: short rising fanfare ──
+  // ── Level complete: powerful ascending hit with shimmer tail ──
   levelComplete(): void {
     const ctx = this.ensureCtx();
     if (!ctx || !this.masterGain) return;
     const now = ctx.currentTime;
 
-    const notes = [196, 262]; // G3, C4
+    // Two-note ascending stab
+    const notes = [196, 294]; // G3, D4 — perfect fifth
     notes.forEach((freq, i) => {
+      const t = now + i * 0.15;
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
-      const filter = this.lpf(ctx, 800);
-      osc.type = 'triangle';
-      const t = now + i * 0.12;
+      const filter = this.lpf(ctx, 1800);
+      osc.type = 'sawtooth';
       osc.frequency.setValueAtTime(freq, t);
       gain.gain.setValueAtTime(0, t);
-      gain.gain.linearRampToValueAtTime(0.18, t + 0.03);
-      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.35);
-      osc.connect(filter);
-      filter.connect(gain);
-      gain.connect(this.masterGain!);
-      osc.start(t);
-      osc.stop(t + 0.35);
-
-      const sub = ctx.createOscillator();
-      const subGain = ctx.createGain();
-      sub.type = 'sine';
-      sub.frequency.setValueAtTime(freq / 2, t);
-      subGain.gain.setValueAtTime(0, t);
-      subGain.gain.linearRampToValueAtTime(0.12, t + 0.03);
-      subGain.gain.exponentialRampToValueAtTime(0.001, t + 0.35);
-      sub.connect(subGain);
-      subGain.connect(this.masterGain!);
-      sub.start(t);
-      sub.stop(t + 0.35);
-    });
-  }
-
-  // ── Defeat: deep descending tones ──
-  defeat(): void {
-    const ctx = this.ensureCtx();
-    if (!ctx || !this.masterGain) return;
-    const now = ctx.currentTime;
-
-    const notes = [220, 185, 156, 110]; // A3, F#3, Eb3, A2
-    notes.forEach((freq, i) => {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      const filter = this.lpf(ctx, 600);
-      osc.type = 'triangle';
-      const t = now + i * 0.25;
-      osc.frequency.setValueAtTime(freq, t);
-      gain.gain.setValueAtTime(0, t);
-      gain.gain.linearRampToValueAtTime(0.15, t + 0.05);
+      gain.gain.linearRampToValueAtTime(0.15, t + 0.03);
       gain.gain.exponentialRampToValueAtTime(0.001, t + 0.6);
       osc.connect(filter);
       filter.connect(gain);
@@ -710,18 +693,98 @@ export class SoundSystem {
       osc.start(t);
       osc.stop(t + 0.6);
 
-      // Sub octave
+      const sub = ctx.createOscillator();
+      const subGain = ctx.createGain();
+      sub.type = 'sine';
+      sub.frequency.value = freq / 2;
+      subGain.gain.setValueAtTime(0, t);
+      subGain.gain.linearRampToValueAtTime(0.2, t + 0.03);
+      subGain.gain.exponentialRampToValueAtTime(0.001, t + 0.5);
+      sub.connect(subGain);
+      subGain.connect(this.masterGain!);
+      sub.start(t);
+      sub.stop(t + 0.5);
+    });
+
+    // Shimmer tail
+    const shimmer = ctx.createOscillator();
+    const shimmerGain = ctx.createGain();
+    shimmer.type = 'sine';
+    shimmer.frequency.value = 588; // D5
+    shimmerGain.gain.setValueAtTime(0, now + 0.3);
+    shimmerGain.gain.linearRampToValueAtTime(0.04, now + 0.4);
+    shimmerGain.gain.exponentialRampToValueAtTime(0.001, now + 1.2);
+    shimmer.connect(shimmerGain);
+    shimmerGain.connect(this.masterGain!);
+    shimmer.start(now + 0.3);
+    shimmer.stop(now + 1.2);
+  }
+
+  // ── Defeat: dark descending doom with distortion ──
+  defeat(): void {
+    const ctx = this.ensureCtx();
+    if (!ctx || !this.masterGain) return;
+    const now = ctx.currentTime;
+
+    // Descending dissonant chord — ominous
+    const notes = [220, 185, 147, 98]; // descending through dark intervals
+    notes.forEach((freq, i) => {
+      const t = now + i * 0.3;
+
+      // Distorted sawtooth for gritty feel
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      const filter = this.lpf(ctx, 800);
+      const distortion = ctx.createWaveShaper();
+      const curve = new Float32Array(256);
+      for (let j = 0; j < 256; j++) {
+        const x = (j / 128) - 1;
+        curve[j] = Math.tanh(x * 2);
+      }
+      distortion.curve = curve;
+
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(freq, t);
+      osc.frequency.exponentialRampToValueAtTime(freq * 0.7, t + 0.8);
+      gain.gain.setValueAtTime(0, t);
+      gain.gain.linearRampToValueAtTime(0.12, t + 0.05);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.9);
+      osc.connect(distortion);
+      distortion.connect(filter);
+      filter.connect(gain);
+      gain.connect(this.masterGain!);
+      osc.start(t);
+      osc.stop(t + 0.9);
+
+      // Sub bass
       const sub = ctx.createOscillator();
       const subGain = ctx.createGain();
       sub.type = 'sine';
       sub.frequency.setValueAtTime(freq / 2, t);
+      sub.frequency.exponentialRampToValueAtTime(freq * 0.3, t + 0.8);
       subGain.gain.setValueAtTime(0, t);
-      subGain.gain.linearRampToValueAtTime(0.12, t + 0.05);
-      subGain.gain.exponentialRampToValueAtTime(0.001, t + 0.6);
+      subGain.gain.linearRampToValueAtTime(0.2, t + 0.05);
+      subGain.gain.exponentialRampToValueAtTime(0.001, t + 0.9);
       sub.connect(subGain);
       subGain.connect(this.masterGain!);
       sub.start(t);
-      sub.stop(t + 0.6);
+      sub.stop(t + 0.9);
     });
+
+    // Long low drone fade-out
+    const drone = ctx.createOscillator();
+    const droneGain = ctx.createGain();
+    const droneFilter = this.lpf(ctx, 200);
+    drone.type = 'sawtooth';
+    drone.frequency.setValueAtTime(55, now + 1.0);
+    drone.frequency.exponentialRampToValueAtTime(20, now + 2.5);
+    droneGain.gain.setValueAtTime(0, now + 1.0);
+    droneGain.gain.linearRampToValueAtTime(0.12, now + 1.2);
+    droneGain.gain.exponentialRampToValueAtTime(0.001, now + 2.5);
+    drone.connect(droneFilter);
+    droneFilter.connect(droneGain);
+    droneGain.connect(this.masterGain!);
+    drone.start(now + 1.0);
+    drone.stop(now + 2.5);
   }
 }
