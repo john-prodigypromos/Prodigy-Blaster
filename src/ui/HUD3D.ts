@@ -155,13 +155,13 @@ export class HUD3D {
 
     // ── Target indicators — throttle to every 3rd frame for performance ──
     if (this.updateCounter % 3 === 0) {
-      this.updateTargetIndicators(enemies, camera);
+      this.updateTargetIndicators(player, enemies, camera);
     }
   }
 
   private enemyHUDs: HTMLDivElement[] = [];
 
-  private updateTargetIndicators(enemies: Ship3D[], camera?: THREE.PerspectiveCamera): void {
+  private updateTargetIndicators(player: Ship3D, enemies: Ship3D[], camera?: THREE.PerspectiveCamera): void {
     // Remove old HUDs
     for (const m of this.enemyHUDs) m.remove();
     this.enemyHUDs = [];
@@ -232,7 +232,7 @@ export class HUD3D {
         tracker.appendChild(arrow);
 
         // Portrait + label row
-        const dist = Math.round(enemy.position.distanceTo(camera.position));
+        const dist = Math.round(enemy.position.distanceTo(player.position));
         const labelRow = document.createElement('div');
         labelRow.style.cssText = 'display:flex;align-items:center;gap:4px;margin-top:2px;justify-content:center;';
 
@@ -273,8 +273,9 @@ export class HUD3D {
         nameRow.appendChild(img);
       }
 
+      const onScreenDist = Math.round(enemy.position.distanceTo(player.position));
       const label = document.createElement('div');
-      label.textContent = ENEMY_NAMES[i] ?? `ENEMY ${i + 1}`;
+      label.textContent = `${ENEMY_NAMES[i] ?? `ENEMY ${i + 1}`} [${onScreenDist}m]`;
       label.style.cssText = `
         font-size:13px;font-weight:bold;color:#ff4444;font-family:Rajdhani,sans-serif;
         letter-spacing:2px;
