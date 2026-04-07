@@ -18,50 +18,57 @@ function injectCSS() {
       border-radius: 50%;
       transform: translate(-50%, -50%);
     }
+    /* Primary blast — bright white-hot core that quickly darkens to smoke */
     @keyframes boom1 {
-      0% { transform: translate(-50%,-50%) scale(0.2); opacity: 1;
-           background: radial-gradient(circle, #fff 0%, #ffffaa 20%, #ffcc00 40%, #ff6600 70%, transparent 100%);
-           box-shadow: 0 0 80px 40px rgba(255,150,0,0.8), 0 0 160px 80px rgba(255,80,0,0.4); }
-      15% { transform: translate(-50%,-50%) scale(1.0); opacity: 1;
-           background: radial-gradient(circle, #ffee88 0%, #ffaa00 40%, #ff4400 70%, transparent 100%);
-           box-shadow: 0 0 60px 30px rgba(255,120,0,0.6); }
-      40% { transform: translate(-50%,-50%) scale(1.4); opacity: 0.8;
-           background: radial-gradient(circle, #ff8844 0%, #ff3300 50%, #aa1100 80%, transparent 100%);
-           box-shadow: 0 0 40px 20px rgba(255,80,0,0.4); }
-      70% { transform: translate(-50%,-50%) scale(1.6); opacity: 0.4;
-           background: radial-gradient(circle, #ff4422 0%, #aa2200 60%, transparent 100%);
-           box-shadow: 0 0 20px 10px rgba(200,40,0,0.2); }
-      100% { transform: translate(-50%,-50%) scale(2.0); opacity: 0;
-           background: radial-gradient(circle, #882200 0%, transparent 70%); box-shadow: none; }
+      0% { transform: translate(-50%,-50%) scale(0.1); opacity: 1;
+           background: radial-gradient(circle, #fff 0%, #fff8cc 15%, #ffaa00 35%, transparent 60%);
+           box-shadow: 0 0 40px 20px rgba(255,200,100,0.7); }
+      8% { transform: translate(-50%,-50%) scale(0.8); opacity: 1;
+           background: radial-gradient(circle, #ffee88 0%, #ff8800 30%, #cc3300 55%, transparent 75%);
+           box-shadow: 0 0 50px 25px rgba(255,100,0,0.5); }
+      25% { transform: translate(-50%,-50%) scale(1.2); opacity: 0.85;
+           background: radial-gradient(circle, #ff6622 0%, #cc2200 35%, #441100 60%, rgba(30,20,15,0.4) 80%, transparent 100%);
+           box-shadow: 0 0 25px 12px rgba(200,60,0,0.3); }
+      55% { transform: translate(-50%,-50%) scale(1.5); opacity: 0.5;
+           background: radial-gradient(circle, #993300 0%, #331100 40%, rgba(20,15,10,0.3) 70%, transparent 100%);
+           box-shadow: none; }
+      100% { transform: translate(-50%,-50%) scale(1.8); opacity: 0;
+           background: radial-gradient(circle, rgba(40,20,10,0.2) 0%, transparent 50%); }
     }
+    /* Secondary fireball — delayed, more orange, billowing smoke */
     @keyframes boom2 {
       0% { transform: translate(-50%,-50%) scale(0.1); opacity: 0; }
-      10% { transform: translate(-50%,-50%) scale(0.4); opacity: 1;
-           background: radial-gradient(circle, #ffff88 0%, #ffaa00 50%, transparent 100%);
-           box-shadow: 0 0 40px 20px rgba(255,200,0,0.5); }
-      40% { transform: translate(-50%,-50%) scale(1.0); opacity: 0.7;
-           background: radial-gradient(circle, #ffcc44 0%, #ff6600 60%, transparent 100%); }
-      100% { transform: translate(-50%,-50%) scale(1.5); opacity: 0;
-           background: radial-gradient(circle, #ff4400 0%, transparent 70%); box-shadow: none; }
-    }
-    @keyframes boom3 {
-      0% { transform: translate(-50%,-50%) scale(0.3); opacity: 0; }
-      20% { transform: translate(-50%,-50%) scale(0.6); opacity: 1;
-           background: radial-gradient(circle, #fff 0%, #ff8800 40%, transparent 100%);
-           box-shadow: 0 0 30px 15px rgba(255,100,0,0.4); }
-      50% { transform: translate(-50%,-50%) scale(1.2); opacity: 0.6;
-           background: radial-gradient(circle, #ffaa44 0%, #ff4400 50%, transparent 100%); }
-      100% { transform: translate(-50%,-50%) scale(1.6); opacity: 0;
-           background: radial-gradient(circle, #cc2200 0%, transparent 60%); box-shadow: none; }
-    }
-    @keyframes hit-flash {
-      0% { transform: translate(-50%,-50%) scale(0.3); opacity: 1;
-           background: radial-gradient(circle, #fff 0%, #ffcc00 50%, transparent 100%);
-           box-shadow: 0 0 30px 15px rgba(255,200,0,0.6); }
-      50% { transform: translate(-50%,-50%) scale(1.0); opacity: 0.6;
-           background: radial-gradient(circle, #ffaa44 0%, #ff6600 60%, transparent 100%); }
+      8% { transform: translate(-50%,-50%) scale(0.3); opacity: 0.9;
+           background: radial-gradient(circle, #ffcc44 0%, #ff6600 40%, transparent 70%);
+           box-shadow: 0 0 30px 15px rgba(255,150,0,0.4); }
+      30% { transform: translate(-50%,-50%) scale(0.8); opacity: 0.7;
+           background: radial-gradient(circle, #ff8833 0%, #aa2200 45%, rgba(30,15,5,0.3) 75%, transparent 100%); }
+      60% { transform: translate(-50%,-50%) scale(1.1); opacity: 0.35;
+           background: radial-gradient(circle, #662200 0%, rgba(25,15,10,0.25) 50%, transparent 80%); }
       100% { transform: translate(-50%,-50%) scale(1.3); opacity: 0;
-           background: radial-gradient(circle, #ff4400 0%, transparent 70%); box-shadow: none; }
+           background: radial-gradient(circle, rgba(30,15,5,0.1) 0%, transparent 50%); }
+    }
+    /* Ember burst — small bright sparks that scatter outward */
+    @keyframes boom3 {
+      0% { transform: translate(-50%,-50%) scale(0.15); opacity: 0; }
+      12% { transform: translate(-50%,-50%) scale(0.5); opacity: 1;
+           background: radial-gradient(circle, #fff 0%, #ffaa44 30%, transparent 55%);
+           box-shadow: 0 0 15px 8px rgba(255,180,50,0.5); }
+      40% { transform: translate(-50%,-50%) scale(0.9); opacity: 0.6;
+           background: radial-gradient(circle, #ffaa44 0%, #cc4400 40%, transparent 65%);
+           box-shadow: 0 0 8px 4px rgba(255,80,0,0.2); }
+      100% { transform: translate(-50%,-50%) scale(1.2); opacity: 0;
+           background: radial-gradient(circle, #882200 0%, transparent 40%); box-shadow: none; }
+    }
+    /* Hit spark — quick bright flash, no lingering */
+    @keyframes hit-flash {
+      0% { transform: translate(-50%,-50%) scale(0.2); opacity: 1;
+           background: radial-gradient(circle, #fff 0%, #ffdd66 40%, transparent 65%);
+           box-shadow: 0 0 15px 8px rgba(255,220,100,0.5); }
+      40% { transform: translate(-50%,-50%) scale(0.7); opacity: 0.5;
+           background: radial-gradient(circle, #ffaa44 0%, #ff6600 50%, transparent 70%); }
+      100% { transform: translate(-50%,-50%) scale(0.9); opacity: 0;
+           background: radial-gradient(circle, #cc4400 0%, transparent 50%); box-shadow: none; }
     }
   `;
   document.head.appendChild(style);
@@ -116,43 +123,46 @@ export class ExplosionPool {
       };
     };
 
-    const jit = () => (Math.random() - 0.5) * 80; // tighter scatter — stays near the ship
-    const rSize = () => 100 + Math.random() * 200;
-    const rDur = () => 1.5 + Math.random() * 2.0;
+    const jit = () => (Math.random() - 0.5) * 50; // tight scatter
+    const rDur = () => 1.2 + Math.random() * 1.5;
     const anims = ['boom1', 'boom2', 'boom3'];
     const rAnim = () => anims[Math.floor(Math.random() * anims.length)];
 
-    // Immediate blast — project NOW
+    // Immediate core blast — bright white-hot, medium size
     const pos0 = project();
     if (pos0.visible) {
-      this.spawnAt(pos0.x, pos0.y, 300, 'boom1', 2.5);
+      this.spawnAt(pos0.x, pos0.y, 180, 'boom1', 2.0);
+      // Secondary fireball slightly offset
+      this.spawnAt(pos0.x + jit() * 0.5, pos0.y + jit() * 0.5, 120, 'boom2', 1.8);
     }
 
     // Delayed fireballs — re-project at spawn time so they track the world point
-    for (let i = 0; i < 10; i++) {
-      const delay = 50 + Math.random() * 1500;
+    for (let i = 0; i < 8; i++) {
+      const delay = 30 + Math.random() * 1000;
+      const size = 60 + Math.random() * 100; // smaller, more varied
       setTimeout(() => {
         const pos = project();
         if (pos.visible) {
-          this.spawnAt(pos.x + jit(), pos.y + jit(), rSize(), rAnim(), rDur());
+          this.spawnAt(pos.x + jit(), pos.y + jit(), size, rAnim(), rDur());
         }
       }, delay);
     }
   }
 
   private spawnDeathAt(screenX: number, screenY: number): void {
-    const jit = () => (Math.random() - 0.5) * 80;
-    const rSize = () => 100 + Math.random() * 200;
-    const rDur = () => 1.5 + Math.random() * 2.0;
+    const jit = () => (Math.random() - 0.5) * 50;
+    const rDur = () => 1.2 + Math.random() * 1.5;
     const anims = ['boom1', 'boom2', 'boom3'];
     const rAnim = () => anims[Math.floor(Math.random() * anims.length)];
 
-    this.spawnAt(screenX, screenY, 300, 'boom1', 2.5);
+    this.spawnAt(screenX, screenY, 180, 'boom1', 2.0);
+    this.spawnAt(screenX + jit() * 0.5, screenY + jit() * 0.5, 120, 'boom2', 1.8);
 
-    for (let i = 0; i < 10; i++) {
-      const delay = 50 + Math.random() * 1500;
+    for (let i = 0; i < 8; i++) {
+      const delay = 30 + Math.random() * 1000;
+      const size = 60 + Math.random() * 100;
       setTimeout(() => {
-        this.spawnAt(screenX + jit(), screenY + jit(), rSize(), rAnim(), rDur());
+        this.spawnAt(screenX + jit(), screenY + jit(), size, rAnim(), rDur());
       }, delay);
     }
   }

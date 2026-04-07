@@ -14,6 +14,8 @@ import { addHighScore, getHighScores } from './state/HighScores';
 import { currentDifficulty } from './state/Difficulty';
 import { COLORS } from './config';
 import { SoundSystem } from './systems/SoundSystem';
+import { getSpawnTaunt, getWinTaunt } from './config/VillainTaunts';
+import { createCinematic, updateCinematic, cleanupCinematic, type CinematicState } from './scenes/TakeoffCinematic';
 
 // ── Globals ──
 let bundle: RendererBundle;
@@ -21,6 +23,7 @@ let clock: THREE.Clock;
 let sceneManager: SceneManager;
 let arena: ArenaState | null = null;
 let hud: HUD3D | null = null;
+let cinematic: CinematicState | null = null;
 let spaceEnv: SpaceEnvironment;
 let globalSound: import('./systems/SoundSystem').SoundSystem | null = null;
 const keys: Record<string, boolean> = {};
@@ -28,6 +31,7 @@ const keys: Record<string, boolean> = {};
 // ── Overlay elements ──
 let overlayEl: HTMLDivElement;
 let crosshairEl: HTMLElement;
+let pauseOverlay: HTMLDivElement | null = null;
 
 function init() {
   const canvas = document.getElementById('game-canvas') as HTMLCanvasElement;
@@ -45,7 +49,12 @@ function init() {
   bundle.camera.lookAt(0, 0, 0);
 
   // ── Input ──
-  window.addEventListener('keydown', (e) => { keys[e.code] = true; });
+  window.addEventListener('keydown', (e) => {
+    keys[e.code] = true;
+    if (e.code === 'Escape' && sceneManager.current === 'arena' && arena) {
+      togglePause();
+    }
+  });
   window.addEventListener('keyup', (e) => { keys[e.code] = false; });
 
   // ── Resize ──
@@ -94,6 +103,9 @@ function handleSceneEnter(state: SceneState, _prev: SceneState | null): void {
     case 'levelIntro':
       showLevelIntroOverlay();
       break;
+    case 'cinematic':
+      startCinematic();
+      break;
     case 'arena':
       startArena();
       break;
@@ -108,12 +120,17 @@ function handleSceneEnter(state: SceneState, _prev: SceneState | null): void {
 
 function handleSceneExit(state: SceneState, _next: SceneState): void {
   clearOverlay();
+  removePauseOverlay();
   if (state === 'arena' && arena) {
     cleanupArena(arena, bundle.scene);
     hud?.destroy();
     hud = null;
     arena = null;
     crosshairEl.style.display = 'none';
+  }
+  if (state === 'cinematic' && cinematic) {
+    cleanupCinematic(cinematic, bundle.scene);
+    cinematic = null;
   }
 }
 
@@ -127,6 +144,8 @@ function clearOverlay(): void {
       child.remove();
     }
   }
+  // Force-remove any lingering death-fx elements (spawned by setTimeout during player death)
+  document.querySelectorAll('.death-fx, .explosion-fx').forEach(el => el.remove());
 }
 
 function createOverlayPanel(cssClass = 'overlay-panel'): HTMLDivElement {
@@ -146,13 +165,20 @@ function createOverlayPanel(cssClass = 'overlay-panel'): HTMLDivElement {
 function showTitleOverlay(): void {
   const panel = createOverlayPanel();
 
+  // Prodigy logo — large and prominent
+  const logo = document.createElement('img');
+  logo.src = '/portraits/prodigy-logo.png';
+  logo.alt = 'Prodigy Promos';
+  logo.style.cssText = 'width:clamp(120px,30vw,240px);height:auto;object-fit:contain;margin-bottom:20px;filter:drop-shadow(0 0 20px rgba(0,200,255,0.3));';
+  panel.appendChild(logo);
+
   const title = document.createElement('div');
   title.textContent = 'OH-YUM BLASTER';
   title.style.cssText = 'font-size:clamp(28px,7vw,56px);font-weight:900;letter-spacing:6px;margin-bottom:12px;text-align:center;font-family:Orbitron,sans-serif;text-shadow:0 0 30px rgba(0,200,255,0.3),0 0 60px rgba(0,100,255,0.15);';
   panel.appendChild(title);
 
   const spacer = document.createElement('div');
-  spacer.style.cssText = 'margin-bottom:40px;';
+  spacer.style.cssText = 'margin-bottom:30px;';
   panel.appendChild(spacer);
 
   const selectLabel = document.createElement('div');
@@ -292,11 +318,6 @@ function showLevelIntroOverlay(): void {
   subtitle.style.cssText = 'font-size:20px;color:#ffcc00;margin-top:12px;letter-spacing:2px;opacity:0;animation:fadeIn 0.5s 0.3s forwards;';
   panel.appendChild(subtitle);
 
-  const enemyCount = document.createElement('div');
-  enemyCount.textContent = `${level.enemyCount} ${level.enemyCount === 1 ? 'ENEMY' : 'ENEMIES'}`;
-  enemyCount.style.cssText = 'font-size:14px;color:#aaa;margin-top:16px;opacity:0;animation:fadeIn 0.5s 0.5s forwards;';
-  panel.appendChild(enemyCount);
-
   // ── Villain intro cards — show new enemies for this level ──
   const villainRow = document.createElement('div');
   villainRow.style.cssText = 'display:flex;gap:30px;margin-top:30px;opacity:0;animation:fadeIn 0.6s 0.8s forwards;';
@@ -318,7 +339,7 @@ function showLevelIntroOverlay(): void {
     const img = document.createElement('img');
     img.src = `/portraits/${villain.portrait}`;
     img.style.cssText = `
-      width:clamp(70px,18vw,120px);height:clamp(70px,18vw,120px);border-radius:50%;object-fit:cover;
+      width:clamp(140px,35vw,240px);height:clamp(140px,35vw,240px);border-radius:50%;object-fit:cover;
       border:3px solid ${isNew ? '#ff4444' : '#662222'};margin-bottom:10px;
       ${isNew ? 'filter:drop-shadow(0 0 12px rgba(255,50,0,0.5));' : ''}
     `;
@@ -333,17 +354,6 @@ function showLevelIntroOverlay(): void {
       ${isNew ? 'text-shadow:0 0 10px rgba(255,50,0,0.4);' : ''}
     `;
     card.appendChild(name);
-
-    // Taunt — only show for the new enemy
-    if (isNew) {
-      const taunt = document.createElement('div');
-      taunt.textContent = `"${villain.taunt}"`;
-      taunt.style.cssText = `
-        font-size:14px;color:#ff8866;font-style:italic;
-        max-width:200px;text-align:center;line-height:1.3;
-      `;
-      card.appendChild(taunt);
-    }
 
     villainRow.appendChild(card);
   }
@@ -368,6 +378,71 @@ function showLevelIntroOverlay(): void {
       sceneManager.transition('arena');
     }
   }, 4500);
+}
+
+function togglePause(): void {
+  if (!arena) return;
+  arena.paused = !arena.paused;
+
+  if (arena.paused) {
+    // Show pause overlay
+    pauseOverlay = document.createElement('div');
+    pauseOverlay.id = 'pause-overlay';
+    pauseOverlay.style.cssText = `
+      position:fixed;top:0;left:0;width:100%;height:100%;
+      display:flex;flex-direction:column;align-items:center;justify-content:center;
+      background:rgba(2,5,8,0.75);z-index:50;
+      font-family:Rajdhani,sans-serif;color:#fff;
+      pointer-events:auto;
+    `;
+
+    const title = document.createElement('div');
+    title.textContent = 'PAUSED';
+    title.style.cssText = `
+      font-size:clamp(32px,8vw,56px);font-weight:900;letter-spacing:6px;
+      font-family:Orbitron,sans-serif;
+      text-shadow:0 0 20px rgba(0,200,255,0.4);
+      margin-bottom:24px;
+    `;
+    pauseOverlay.appendChild(title);
+
+    const hint = document.createElement('div');
+    hint.textContent = 'Press ESC to resume';
+    hint.style.cssText = 'font-size:16px;color:#88aacc;letter-spacing:2px;margin-bottom:32px;';
+    pauseOverlay.appendChild(hint);
+
+    const quitBtn = document.createElement('button');
+    quitBtn.textContent = 'QUIT TO TITLE';
+    quitBtn.style.cssText = `
+      padding:12px 32px;background:rgba(17,24,34,0.9);border:2px solid #ff4444;
+      color:#ff4444;font-size:16px;font-weight:bold;font-family:Rajdhani,sans-serif;
+      cursor:pointer;border-radius:4px;
+    `;
+    quitBtn.addEventListener('click', () => {
+      arena!.paused = false;
+      removePauseOverlay();
+      sceneManager.transition('title');
+    });
+    quitBtn.addEventListener('mouseenter', () => { quitBtn.style.background = 'rgba(40,15,15,0.95)'; });
+    quitBtn.addEventListener('mouseleave', () => { quitBtn.style.background = 'rgba(17,24,34,0.9)'; });
+    pauseOverlay.appendChild(quitBtn);
+
+    overlayEl.appendChild(pauseOverlay);
+  } else {
+    removePauseOverlay();
+  }
+}
+
+function removePauseOverlay(): void {
+  if (pauseOverlay) {
+    pauseOverlay.remove();
+    pauseOverlay = null;
+  }
+}
+
+function startCinematic(): void {
+  crosshairEl.style.display = 'none';
+  cinematic = createCinematic(bundle.scene, bundle.camera);
 }
 
 function startArena(): void {
@@ -503,10 +578,12 @@ function showGameOverOverlay(): void {
   `;
   panel.appendChild(villainImg);
 
-  // Villain monologue — unique taunt per enemy
-  const villainLines = ['I am so righteous', "That's what I thought, thug", "Don't mess with my empire"];
+  // Villain monologue — pull from VillainTaunts config
+  const villainKeys = ['bolo_tie', 'bow_tie', 'bishop'];
+  const villainKey = villainKeys[Math.min(currentLevelIndex, villainKeys.length - 1)];
+  const winLine = getWinTaunt(villainKey) ?? 'You lose!';
   const monologue = document.createElement('div');
-  monologue.textContent = `"${villainLines[Math.min(currentLevelIndex, villainLines.length - 1)]}"`;
+  monologue.textContent = winLine;
   monologue.style.cssText = `
     font-size:clamp(22px,6vw,42px);font-weight:bold;color:#ff4444;font-style:italic;
     letter-spacing:2px;margin-bottom:16px;text-align:center;
@@ -554,11 +631,19 @@ function animate() {
   const now = performance.now();
 
   if (sceneManager.current === 'arena' && arena) {
-    updateArena(arena, keys, dt, now);
+    // Taunt callback — only spawn taunts now
+    const tauntCb = (villainId: string, _event: string) => {
+      const text = getSpawnTaunt(villainId);
+      if (text && hud) hud.showTaunt(text);
+    };
+    updateArena(arena, keys, dt, now, tauntCb);
 
     // Update HUD
     if (hud) {
-      hud.update(arena.player, arena.enemies, arena.score, currentLevelIndex + 1, bundle.camera);
+      const isThrusting = keys['KeyE'] || arena.touchControls.getInput().thrust > 0;
+      const playerSpeed = arena.player.velocity.length();
+      hud.update(arena.player, arena.enemies, arena.score, currentLevelIndex + 1, bundle.camera, isThrusting, playerSpeed);
+      hud.updateTaunts(dt);
     }
 
     // Check win/lose — wait 2.5s for explosions to play out
@@ -578,6 +663,11 @@ function animate() {
       }
     } else if (arena.gameOver && now - arena.gameOverTime > TRANSITION_DELAY) {
       sceneManager.transition('gameOver');
+    }
+  } else if (sceneManager.current === 'cinematic' && cinematic) {
+    updateCinematic(cinematic, bundle.camera, dt);
+    if (cinematic.done) {
+      sceneManager.transition('arena');
     }
   } else if (sceneManager.current === 'title') {
     // Slowly rotate camera for cinematic idle

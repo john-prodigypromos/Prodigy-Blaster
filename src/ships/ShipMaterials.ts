@@ -109,34 +109,34 @@ export function createEnemyMaterials(): ShipMaterialSet {
     thickness: 0.3,
   });
 
-  // Red accent strip material — glowing edge lighting
+  // Red accent strip material — subtle edge lighting
   const accent = new THREE.MeshStandardMaterial({
     color: 0x110000,
     emissive: 0xff2200,
-    emissiveIntensity: 3.0,
+    emissiveIntensity: 1.5,
     metalness: 0.2,
     roughness: 0.3,
   });
 
-  // Engine core — intense white-orange glow
+  // Engine core — subdued orange glow
   const engine = new THREE.MeshStandardMaterial({
     color: 0x222222,
     metalness: 0.9,
     roughness: 0.3,
     emissive: 0xff6622,
-    emissiveIntensity: 3.0,
+    emissiveIntensity: 1.2,
   });
 
-  // Nozzle — bright hot exhaust
+  // Nozzle — dimmer exhaust
   const nozzle = new THREE.MeshBasicMaterial({
     color: 0xff8844,
     transparent: true,
-    opacity: 0.85,
+    opacity: 0.45,
     side: THREE.DoubleSide,
   });
 
-  // Stronger engine light — dramatic orange/red cast
-  const engineLight = new THREE.PointLight(0xff4400, 8, 100, 2);
+  // Engine light — subtle cast, not blinding
+  const engineLight = new THREE.PointLight(0xff4400, 3, 80, 2);
 
   return { hull, cockpit, engine, nozzle, engineLight, accent, armorDark };
 }

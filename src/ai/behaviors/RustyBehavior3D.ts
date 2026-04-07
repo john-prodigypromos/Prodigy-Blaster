@@ -43,22 +43,22 @@ export class RustyBehavior3D implements AIBehavior3D {
 
     const distToPlayer = self.position.distanceTo(target.position);
 
-    // ── Phase transitions — longer, more gradual engagement ──
-    if (this.phase === 'cruise' && this.phaseTimer > 6 + this.idx * 2) {
-      // After cruising visibly, start closing in
+    // ── Phase transitions — aggressive engagement with shorter passive phases ──
+    if (this.phase === 'cruise' && this.phaseTimer > 3 + this.idx * 1.5) {
+      // Short cruise — close in quickly
       this.phase = 'closing';
       this.phaseTimer = 0;
-    } else if (this.phase === 'closing' && (distToPlayer < 80 || this.phaseTimer > 8)) {
+    } else if (this.phase === 'closing' && (distToPlayer < 80 || this.phaseTimer > 5)) {
       // Close enough for dogfight
       this.phase = 'dogfight';
       this.phaseTimer = 0;
-    } else if (this.phase === 'dogfight' && this.phaseTimer > 10) {
+    } else if (this.phase === 'dogfight' && this.phaseTimer > 12) {
       // Long dogfight, then break away for another pass
       this.phase = 'breakaway';
       this.phaseTimer = 0;
-    } else if (this.phase === 'breakaway' && (distToPlayer > 250 || this.phaseTimer > 4)) {
-      // Pull out to visible range, then cruise again
-      this.phase = 'cruise';
+    } else if (this.phase === 'breakaway' && (distToPlayer > 200 || this.phaseTimer > 3)) {
+      // Quick breakaway, then back to closing (skip cruise on repeat passes)
+      this.phase = 'closing';
       this.phaseTimer = 0;
     }
 
@@ -104,7 +104,7 @@ export class RustyBehavior3D implements AIBehavior3D {
         // Close-range maneuvering — fly around the player at combat distance
         // Mix of orbiting and darting behind
         const playerFwd = target.getForward();
-        const combatRadius = 60 + Math.sin(this.timer * 0.8) * 30; // 30-90 range
+        const combatRadius = 40 + Math.sin(this.timer * 0.8) * 25; // 15-65 range — tighter
 
         // Orbit with bias toward getting behind the player
         const behindBias = playerFwd.clone().multiplyScalar(-40);

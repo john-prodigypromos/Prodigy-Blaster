@@ -363,43 +363,98 @@ export class SoundSystem {
   }
 
   // ── Background Music: real audio file playback ──
+  // iOS/Safari fixes: resume AudioContext on visibility change,
+  // re-attempt play on every user gesture, preload audio element.
   private musicPlaying = false;
   private musicElement: HTMLAudioElement | null = null;
   private musicGainNode: GainNode | null = null;
   private musicSource: MediaElementAudioSourceNode | null = null;
+  private musicSourceCreated = false;
+  private visibilityHandler: (() => void) | null = null;
+  private musicRetryHandler: (() => void) | null = null;
+
+  private static isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent) ||
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 
   startMusic(): void {
+    // Kill music entirely on iOS/iPadOS — too unreliable
+    if (SoundSystem.isIOS) return;
+
     if (this.musicPlaying) return;
     const ctx = this.ensureCtx();
     if (!ctx || !this.masterGain) return;
     this.musicPlaying = true;
 
-    // Create audio element for the battle soundtrack
-    // OGG is preferred but Safari/iOS doesn't support it — fall back to MP3
-    this.musicElement = new Audio();
-    this.musicElement.loop = true;
-    this.musicElement.volume = 1.0;
-    const canPlayOgg = this.musicElement.canPlayType('audio/ogg; codecs="vorbis"');
-    this.musicElement.src = canPlayOgg ? '/audio/cyberpunk_battle.ogg' : '/audio/battle_loop.mp3';
+    // Create audio element — prefer MP3 for broadest Safari support
+    if (!this.musicElement) {
+      this.musicElement = new Audio();
+      this.musicElement.loop = true;
+      this.musicElement.volume = 1.0;
+      this.musicElement.preload = 'auto';
+      this.musicElement.setAttribute('playsinline', ''); // iOS: don't fullscreen
+      const canPlayOgg = this.musicElement.canPlayType('audio/ogg; codecs="vorbis"');
+      this.musicElement.src = canPlayOgg ? '/audio/cyberpunk_battle.ogg' : '/audio/battle_loop.mp3';
+      this.musicElement.load(); // force preload on iOS
+    }
 
-    // Route through Web Audio API for gain control
-    this.musicSource = ctx.createMediaElementSource(this.musicElement);
-    this.musicGainNode = ctx.createGain();
-    this.musicGainNode.gain.value = 0.35; // background level — doesn't overpower SFX
-    this.musicSource.connect(this.musicGainNode);
-    this.musicGainNode.connect(this.masterGain);
+    // Route through Web Audio API for gain control (only once per element)
+    if (!this.musicSourceCreated) {
+      this.musicSourceCreated = true;
+      this.musicSource = ctx.createMediaElementSource(this.musicElement);
+      this.musicGainNode = ctx.createGain();
+      this.musicGainNode.gain.value = 0.35;
+      this.musicSource.connect(this.musicGainNode);
+      this.musicGainNode.connect(this.masterGain);
+    }
 
-    // Start playback (may need user gesture — handled by init() timing)
-    this.musicElement.play().catch(() => {
-      // Autoplay blocked — will start on next user interaction
-      const startOnInteract = () => {
-        this.musicElement?.play();
-        document.removeEventListener('click', startOnInteract);
-        document.removeEventListener('touchstart', startOnInteract);
+    // Attempt play — iOS may block this until a gesture
+    this.attemptPlay();
+
+    // Retry on every touch/click until it works (iOS needs gesture per AudioContext resume)
+    if (!this.musicRetryHandler) {
+      this.musicRetryHandler = () => this.attemptPlay();
+      document.addEventListener('click', this.musicRetryHandler, { passive: true });
+      document.addEventListener('touchstart', this.musicRetryHandler, { passive: true });
+      document.addEventListener('touchend', this.musicRetryHandler, { passive: true });
+    }
+
+    // Resume on tab/app visibility change (iOS suspends AudioContext when backgrounded)
+    if (!this.visibilityHandler) {
+      this.visibilityHandler = () => {
+        if (document.visibilityState === 'visible' && this.musicPlaying) {
+          this.attemptPlay();
+        }
       };
-      document.addEventListener('click', startOnInteract);
-      document.addEventListener('touchstart', startOnInteract);
-    });
+      document.addEventListener('visibilitychange', this.visibilityHandler);
+    }
+  }
+
+  private attemptPlay(): void {
+    if (!this.musicElement || !this.musicPlaying) return;
+
+    // Resume suspended AudioContext first (required on iOS after background/lock)
+    if (this.ctx?.state === 'suspended') {
+      this.ctx.resume().catch(() => {});
+    }
+
+    // Then play the audio element
+    if (this.musicElement.paused) {
+      this.musicElement.play().then(() => {
+        // Success — remove retry listeners
+        this.removeMusicRetryListeners();
+      }).catch(() => {
+        // Still blocked — retry listeners stay active
+      });
+    }
+  }
+
+  private removeMusicRetryListeners(): void {
+    if (this.musicRetryHandler) {
+      document.removeEventListener('click', this.musicRetryHandler);
+      document.removeEventListener('touchstart', this.musicRetryHandler);
+      document.removeEventListener('touchend', this.musicRetryHandler);
+      this.musicRetryHandler = null;
+    }
   }
 
   isMusicPlaying(): boolean {
@@ -408,23 +463,87 @@ export class SoundSystem {
 
   stopMusic(): void {
     this.musicPlaying = false;
+    this.removeMusicRetryListeners();
+    if (this.visibilityHandler) {
+      document.removeEventListener('visibilitychange', this.visibilityHandler);
+      this.visibilityHandler = null;
+    }
     if (this.musicElement) {
-      // Fade out over 0.5s
       if (this.musicGainNode && this.ctx) {
         const now = this.ctx.currentTime;
         this.musicGainNode.gain.setValueAtTime(this.musicGainNode.gain.value, now);
         this.musicGainNode.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
-        setTimeout(() => {
-          this.musicElement?.pause();
-          this.musicElement = null;
-          this.musicSource = null;
-          this.musicGainNode = null;
-        }, 600);
+        const el = this.musicElement;
+        setTimeout(() => { el.pause(); }, 600);
       } else {
         this.musicElement.pause();
-        this.musicElement = null;
       }
     }
+  }
+
+  /** Set music intensity — 0 = ambient hum, 0.5 = mid tension, 1 = full combat.
+   *  Adjusts gain and optionally a low-pass filter for mood shifts. */
+  private musicIntensity = 0.5;
+
+  setMusicIntensity(intensity: number): void {
+    this.musicIntensity = Math.max(0, Math.min(1, intensity));
+    if (!this.musicGainNode || !this.ctx) return;
+
+    // Map intensity to gain: 0.15 (ambient) → 0.35 (combat)
+    const targetGain = 0.15 + this.musicIntensity * 0.2;
+    const now = this.ctx.currentTime;
+    this.musicGainNode.gain.setValueAtTime(this.musicGainNode.gain.value, now);
+    this.musicGainNode.gain.linearRampToValueAtTime(targetGain, now + 0.5);
+  }
+
+  /** Drop music to a low hum for slow-mo kill shot. */
+  dropToHum(): void {
+    this.setMusicIntensity(0.1);
+  }
+
+  /** Restore normal music intensity. */
+  restoreMusic(): void {
+    this.setMusicIntensity(0.5);
+  }
+
+  // Boss phase stinger — brief cymbal crash + brass hit for phase transitions
+  bossPhaseStinger(): void {
+    const ctx = this.ensureCtx();
+    if (!ctx || !this.masterGain) return;
+    const now = ctx.currentTime;
+
+    // Cymbal crash — filtered noise
+    const crashSize = ctx.sampleRate * 0.4;
+    const crashBuf = ctx.createBuffer(1, crashSize, ctx.sampleRate);
+    const crashData = crashBuf.getChannelData(0);
+    for (let i = 0; i < crashSize; i++) {
+      crashData[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / crashSize, 1.5);
+    }
+    const crash = ctx.createBufferSource();
+    crash.buffer = crashBuf;
+    const crashFilter = this.lpf(ctx, 3000);
+    const crashGain = ctx.createGain();
+    crashGain.gain.setValueAtTime(0.2, now);
+    crashGain.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
+    crash.connect(crashFilter);
+    crashFilter.connect(crashGain);
+    crashGain.connect(this.masterGain);
+    crash.start(now);
+
+    // Brass stab
+    const stab = ctx.createOscillator();
+    const stabGain = ctx.createGain();
+    const stabFilter = this.lpf(ctx, 1500);
+    stab.type = 'sawtooth';
+    stab.frequency.setValueAtTime(220, now);
+    stabGain.gain.setValueAtTime(0, now);
+    stabGain.gain.linearRampToValueAtTime(0.15, now + 0.02);
+    stabGain.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
+    stab.connect(stabFilter);
+    stabFilter.connect(stabGain);
+    stabGain.connect(this.masterGain);
+    stab.start(now);
+    stab.stop(now + 0.4);
   }
 
   // ── "YAY!" — triumphant cinematic brass-style stab ──

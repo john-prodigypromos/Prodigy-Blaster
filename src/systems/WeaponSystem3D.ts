@@ -8,8 +8,7 @@ import { BoltPool } from '../entities/Bolt3D';
 import { WEAPONS } from '../config';
 
 const PLAYER_BOLT_OFFSETS = [
-  new THREE.Vector3(-1.2, -0.5, 12),
-  new THREE.Vector3(1.2, -0.5, 12),
+  new THREE.Vector3(0, -0.3, 12),
 ];
 
 const ENEMY_BOLT_OFFSET = new THREE.Vector3(0, 0, 3);
@@ -49,11 +48,12 @@ export function tryFireWeapon(
 
     // Vertical offset: how far above/below the player the enemy is
     const verticalOffset = Math.abs(ship.position.y - target.position.y);
-    const isAboveOrBelow = verticalOffset > 12; // must be well above or below — no shallow angles
+    const isAboveOrBelow = verticalOffset > 10; // must be well above or below
 
-    // Allow fire only if: enemy is behind the player OR significantly above/below
-    const isBehindPlayer = facingDot < -0.35; // must be well behind the player — no flank shots
-    if (!isBehindPlayer && !isAboveOrBelow) return false;
+    // Allow fire only if: enemy is behind player OR significantly above/below
+    // facingDot > 0 = in front of player, < 0 = behind player
+    const isBehind = facingDot < -0.3; // must be clearly behind — no flank cheese
+    if (!isBehind && !isAboveOrBelow) return false;
   }
 
   const offsets = ship.isPlayer ? PLAYER_BOLT_OFFSETS : [ENEMY_BOLT_OFFSET];

@@ -55,10 +55,10 @@ export class TouchControls3D {
     this.canvas.height = h;
 
     const ref = Math.min(w, h);
-    this.joystickRadius = Math.round(ref * 0.12);
-    this.fireRadius = Math.round(ref * 0.09);
-    this.thrustRadius = Math.round(ref * 0.07);
-    this.reverseRadius = Math.round(ref * 0.07);
+    this.joystickRadius = Math.round(ref * 0.14);
+    this.fireRadius = Math.round(ref * 0.12);
+    this.thrustRadius = Math.round(ref * 0.09);
+    this.reverseRadius = Math.round(ref * 0.09);
 
     const margin = Math.round(ref * 0.22);
     const joystickBottomMargin = Math.round(ref * 0.35); // extra clearance above score HUD
@@ -84,10 +84,10 @@ export class TouchControls3D {
     this.canvas.height = h;
 
     const ref = Math.min(w, h);
-    this.joystickRadius = Math.round(ref * 0.12);
-    this.fireRadius = Math.round(ref * 0.09);
-    this.thrustRadius = Math.round(ref * 0.07);
-    this.reverseRadius = Math.round(ref * 0.07);
+    this.joystickRadius = Math.round(ref * 0.14);
+    this.fireRadius = Math.round(ref * 0.12);
+    this.thrustRadius = Math.round(ref * 0.09);
+    this.reverseRadius = Math.round(ref * 0.09);
 
     const margin = Math.round(ref * 0.22);
     const joystickBottomMargin = Math.round(ref * 0.35); // extra clearance above score HUD
@@ -207,42 +207,41 @@ export class TouchControls3D {
     ctx.arc(thumbX, thumbY, this.joystickRadius * 0.3, 0, Math.PI * 2);
     ctx.fill();
 
-    // Fire button
-    ctx.fillStyle = this.firePressed ? 'rgba(255,68,34,0.5)' : 'rgba(255,102,68,0.25)';
+    // Fire button — cyan matching player laser bolts (#00ddff)
+    ctx.fillStyle = this.firePressed ? 'rgba(0,221,255,0.5)' : 'rgba(0,221,255,0.25)';
     ctx.beginPath();
     ctx.arc(this.fireCenter.x, this.fireCenter.y, this.fireRadius, 0, Math.PI * 2);
     ctx.fill();
-    ctx.strokeStyle = 'rgba(255,102,68,0.5)';
+    ctx.strokeStyle = 'rgba(0,221,255,0.5)';
     ctx.stroke();
 
-    // Fire label
-    ctx.fillStyle = 'rgba(255,102,68,0.6)';
-    ctx.font = 'bold 12px Rajdhani';
+    ctx.fillStyle = 'rgba(0,221,255,0.7)';
+    ctx.font = 'bold 16px Rajdhani';
     ctx.textAlign = 'center';
     ctx.fillText('FIRE', this.fireCenter.x, this.fireCenter.y + 4);
 
-    // Thrust button
-    ctx.fillStyle = this.thrustPressed ? 'rgba(0,136,255,0.5)' : 'rgba(0,136,255,0.25)';
+    // Thrust button — green
+    ctx.fillStyle = this.thrustPressed ? 'rgba(68,255,68,0.5)' : 'rgba(68,255,68,0.25)';
     ctx.beginPath();
     ctx.arc(this.thrustCenter.x, this.thrustCenter.y, this.thrustRadius, 0, Math.PI * 2);
     ctx.fill();
-    ctx.strokeStyle = 'rgba(0,136,255,0.5)';
+    ctx.strokeStyle = 'rgba(68,255,68,0.5)';
     ctx.stroke();
 
-    ctx.fillStyle = 'rgba(0,136,255,0.6)';
-    ctx.font = 'bold 10px Rajdhani';
+    ctx.fillStyle = 'rgba(68,255,68,0.7)';
+    ctx.font = 'bold 14px Rajdhani';
     ctx.fillText('THRUST', this.thrustCenter.x, this.thrustCenter.y + 4);
 
-    // Reverse button
-    ctx.fillStyle = this.reversePressed ? 'rgba(255,170,0,0.5)' : 'rgba(255,170,0,0.25)';
+    // Reverse button — red
+    ctx.fillStyle = this.reversePressed ? 'rgba(255,68,68,0.5)' : 'rgba(255,68,68,0.25)';
     ctx.beginPath();
     ctx.arc(this.reverseCenter.x, this.reverseCenter.y, this.reverseRadius, 0, Math.PI * 2);
     ctx.fill();
-    ctx.strokeStyle = 'rgba(255,170,0,0.5)';
+    ctx.strokeStyle = 'rgba(255,68,68,0.5)';
     ctx.stroke();
 
-    ctx.fillStyle = 'rgba(255,170,0,0.6)';
-    ctx.font = 'bold 10px Rajdhani';
+    ctx.fillStyle = 'rgba(255,68,68,0.7)';
+    ctx.font = 'bold 14px Rajdhani';
     ctx.fillText('REVERSE', this.reverseCenter.x, this.reverseCenter.y + 4);
   }
 

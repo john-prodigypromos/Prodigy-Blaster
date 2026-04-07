@@ -31,6 +31,14 @@ export class HUD3D {
   private scoreEl: HTMLSpanElement;
   private targetsEl: HTMLSpanElement;
   private levelEl: HTMLSpanElement;
+  private speedLinesEl: HTMLDivElement;
+  private tauntEl: HTMLDivElement;
+  private tauntTextEl: HTMLSpanElement;
+  private tauntTimer = 0;
+  private tauntCooldown = 0;
+  private tauntTypewriterText = '';
+  private tauntTypewriterIdx = 0;
+  private tauntTypewriterTimer = 0;
 
   constructor() {
     const overlay = document.getElementById('ui-overlay')!;
@@ -40,17 +48,17 @@ export class HUD3D {
     style.textContent = `
       #hud { position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:20;font-family:Rajdhani,sans-serif; }
       .hud-top-left { position:absolute;top:16px;left:16px; }
-      .hud-bar-container { width:200px;height:14px;background:rgba(0,0,0,0.6);border:1px solid rgba(255,255,255,0.2);border-radius:2px;margin-bottom:6px;overflow:hidden; }
+      .hud-bar-container { width:clamp(140px,25vw,200px);height:14px;background:rgba(0,0,0,0.6);border:1px solid rgba(255,255,255,0.2);border-radius:2px;margin-bottom:6px;overflow:hidden; }
       .hud-bar-fill { height:100%;transition:width 0.15s ease-out; }
-      .hud-bar-label { font-size:10px;color:#aaa;text-transform:uppercase;letter-spacing:1px;margin-bottom:2px; }
+      .hud-bar-label { font-size:clamp(9px,1.5vw,10px);color:#aaa;text-transform:uppercase;letter-spacing:1px;margin-bottom:2px; }
       .hud-shield-fill { background:linear-gradient(90deg,#006688,#00ccff); }
       .hud-hull-fill { background:linear-gradient(90deg,#226622,#44ff44); }
       .hud-top-center { position:absolute;top:12px;left:50%;transform:translateX(-50%);font-size:14px;font-weight:700;color:rgba(255,255,255,0.4);letter-spacing:4px;font-family:Orbitron,sans-serif; }
-      .hud-bottom-left { position:absolute;bottom:8px;left:16px;font-size:14px;color:#fff;z-index:25; }
+      .hud-bottom-left { position:absolute;bottom:clamp(8px,3vh,20px);left:16px;font-size:14px;color:#fff;z-index:25; }
       .hud-score { font-size:18px;font-weight:bold;color:#ffdd00;text-shadow:0 0 10px rgba(255,220,0,0.8),0 0 20px rgba(255,180,0,0.4); }
       .hud-targets { font-size:13px;color:#ddd;margin-top:4px;text-shadow:0 0 6px rgba(200,200,200,0.6); }
       .hud-level { font-size:12px;color:#bbddff;margin-top:4px;text-shadow:0 0 6px rgba(140,180,220,0.6); }
-      .hud-bottom-right { position:absolute;bottom:8px;right:16px;font-size:14px;font-weight:bold;color:#00ff66;letter-spacing:1px;text-shadow:0 0 10px rgba(0,255,100,0.8),0 0 20px rgba(0,200,80,0.4);z-index:25; }
+      .hud-bottom-right { position:absolute;bottom:clamp(8px,3vh,20px);right:16px;font-size:14px;font-weight:bold;color:#00ff66;letter-spacing:1px;text-shadow:0 0 10px rgba(0,255,100,0.8),0 0 20px rgba(0,200,80,0.4);z-index:25; }
 
       /* ── Cockpit frame overlay ── */
       .cockpit-frame {
@@ -93,6 +101,37 @@ export class HUD3D {
       .cockpit-strut.left { left:20%; transform:rotate(8deg); transform-origin:bottom center; }
       .cockpit-strut.right { right:20%; transform:rotate(-8deg); transform-origin:bottom center; }
       .cockpit-strut.center { left:50%; transform:translateX(-50%); width:1px; background:linear-gradient(to top, rgba(60,100,140,0.15), transparent 70%); }
+
+      /* ── Villain taunt popup ── */
+      .taunt-popup {
+        position:fixed;top:80px;right:20px;
+        max-width:260px;padding:10px 16px;
+        background:rgba(40,10,10,0.85);
+        border:2px solid #ff4444;border-radius:8px;
+        color:#ff8866;font-size:14px;font-style:italic;
+        font-family:Rajdhani,sans-serif;letter-spacing:0.5px;
+        z-index:25;pointer-events:none;
+        opacity:0;transition:opacity 0.3s ease-out;
+        text-shadow:0 0 6px rgba(255,50,0,0.3);
+        line-height:1.4;
+      }
+      .taunt-popup.visible { opacity:1; }
+
+      /* ── Speed lines overlay ── */
+      .speed-lines {
+        position:fixed;top:0;left:0;width:100%;height:100%;
+        pointer-events:none;z-index:18;opacity:0;
+        transition:opacity 0.3s ease-out;
+        background:
+          linear-gradient(175deg, transparent 45%, rgba(255,255,255,0.04) 47%, transparent 49%),
+          linear-gradient(185deg, transparent 45%, rgba(255,255,255,0.03) 47%, transparent 49%),
+          linear-gradient(170deg, transparent 44%, rgba(200,220,255,0.04) 46%, transparent 48%),
+          linear-gradient(190deg, transparent 44%, rgba(200,220,255,0.03) 46%, transparent 48%),
+          linear-gradient(178deg, transparent 43%, rgba(255,255,255,0.02) 45%, transparent 47%),
+          linear-gradient(182deg, transparent 43%, rgba(255,255,255,0.02) 45%, transparent 47%);
+        mask-image:radial-gradient(ellipse at center, transparent 30%, black 70%);
+        -webkit-mask-image:radial-gradient(ellipse at center, transparent 30%, black 70%);
+      }
     `;
     document.head.appendChild(style);
 
@@ -184,15 +223,35 @@ export class HUD3D {
     frame.appendChild(strutC);
     this.container.appendChild(frame);
 
+    // Speed lines overlay
+    this.speedLinesEl = document.createElement('div');
+    this.speedLinesEl.className = 'speed-lines';
+    this.container.appendChild(this.speedLinesEl);
+
+    // Taunt popup
+    this.tauntEl = document.createElement('div');
+    this.tauntEl.className = 'taunt-popup';
+    this.tauntTextEl = document.createElement('span');
+    this.tauntEl.appendChild(this.tauntTextEl);
+    this.container.appendChild(this.tauntEl);
+
     overlay.appendChild(this.container);
   }
 
   private updateCounter = 0;
 
-  update(player: Ship3D, enemies: Ship3D[], score: number, level: number, camera?: THREE.PerspectiveCamera): void {
+  update(player: Ship3D, enemies: Ship3D[], score: number, level: number, camera?: THREE.PerspectiveCamera, thrusting = false, speed = 0): void {
     this.updateCounter++;
     this.shieldBar.style.width = `${player.shieldPct * 100}%`;
     this.hullBar.style.width = `${(1 - player.damagePct) * 100}%`;
+
+    // Speed lines — intensity scales with velocity while thrusting
+    if (thrusting && speed > 20) {
+      const intensity = Math.min(0.8, (speed - 20) / 80);
+      this.speedLinesEl.style.opacity = String(intensity);
+    } else {
+      this.speedLinesEl.style.opacity = '0';
+    }
 
     if (player.damagePct > 0.75) {
       this.hullBar.style.background = 'linear-gradient(90deg, #882222, #ff4444)';
@@ -356,6 +415,42 @@ export class HUD3D {
 
       this.container.appendChild(hud);
       this.enemyHUDs.push(hud);
+    }
+  }
+
+  /** Show a villain taunt with typewriter effect. Respects 5s cooldown. */
+  showTaunt(text: string): void {
+    if (this.tauntCooldown > 0) return;
+    this.tauntTypewriterText = text;
+    this.tauntTypewriterIdx = 0;
+    this.tauntTypewriterTimer = 0;
+    this.tauntTimer = 3; // visible for 3 seconds
+    this.tauntCooldown = 5; // 5 second cooldown
+    this.tauntTextEl.textContent = '';
+    this.tauntEl.classList.add('visible');
+  }
+
+  /** Call each frame with dt to tick typewriter and timers. */
+  updateTaunts(dt: number): void {
+    if (this.tauntCooldown > 0) this.tauntCooldown -= dt;
+
+    if (this.tauntTimer > 0) {
+      this.tauntTimer -= dt;
+
+      // Typewriter effect
+      if (this.tauntTypewriterIdx < this.tauntTypewriterText.length) {
+        this.tauntTypewriterTimer += dt;
+        const charsPerSec = 30;
+        while (this.tauntTypewriterTimer > 1 / charsPerSec && this.tauntTypewriterIdx < this.tauntTypewriterText.length) {
+          this.tauntTypewriterTimer -= 1 / charsPerSec;
+          this.tauntTypewriterIdx++;
+          this.tauntTextEl.textContent = this.tauntTypewriterText.substring(0, this.tauntTypewriterIdx);
+        }
+      }
+
+      if (this.tauntTimer <= 0) {
+        this.tauntEl.classList.remove('visible');
+      }
     }
   }
 

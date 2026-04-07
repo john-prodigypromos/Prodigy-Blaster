@@ -11,8 +11,8 @@ export interface LevelConfig {
 
 export const LEVELS: LevelConfig[] = [
   { level: 1, enemyCount: 1, enemySpeedBonus: 1.0, enemyRotationBonus: 1.0, enemyFireRateBonus: 1.0, subtitle: 'THE HUNT BEGINS' },
-  { level: 2, enemyCount: 2, enemySpeedBonus: 1.1, enemyRotationBonus: 1.1, enemyFireRateBonus: 0.9, subtitle: 'DOUBLE TROUBLE' },
-  { level: 3, enemyCount: 3, enemySpeedBonus: 1.2, enemyRotationBonus: 1.2, enemyFireRateBonus: 0.8, subtitle: 'THE FINAL WAVE' },
+  { level: 2, enemyCount: 2, enemySpeedBonus: 1.15, enemyRotationBonus: 1.15, enemyFireRateBonus: 0.85, subtitle: 'DOUBLE TROUBLE' },
+  { level: 3, enemyCount: 3, enemySpeedBonus: 1.3, enemyRotationBonus: 1.3, enemyFireRateBonus: 0.7, subtitle: 'THE FINAL WAVE' },
 ];
 
 /** Current level index (0-based) */

@@ -12,6 +12,10 @@ import { applyShipPhysics, checkShipCollision, resolveShipCollision, type ShipIn
 import { tryFireWeapon } from '../systems/WeaponSystem3D';
 import { processBoltDamage } from '../systems/DamageSystem3D';
 import { RustyBehavior3D } from '../ai/behaviors/RustyBehavior3D';
+import { BoloTieBehavior3D } from '../ai/behaviors/BoloTieBehavior3D';
+import { BowTieBehavior3D } from '../ai/behaviors/BowTieBehavior3D';
+import { BishopBehavior3D } from '../ai/behaviors/BishopBehavior3D';
+import type { AIBehavior3D } from '../ai/AIBehavior3D';
 import { createPlayerShipGeometry, createEnemyShipGeometry } from '../ships/ShipGeometry';
 import { createPlayerMaterials, createEnemyMaterials, applyMaterials } from '../ships/ShipMaterials';
 import { TouchControls3D } from '../ui/TouchControls3D';
@@ -20,13 +24,18 @@ import { SoundSystem } from '../systems/SoundSystem';
 import { SHIP, AI, PHYSICS } from '../config';
 import { getCurrentLevel, type LevelConfig } from '../state/LevelState';
 import { DIFFICULTY, currentDifficulty } from '../state/Difficulty';
+import { ParticleSystem3D } from '../systems/ParticleSystem3D';
+import { createLevelEnvironment, type LevelEnvironment } from '../systems/EnvironmentLoader';
+import { getSpawnTaunt } from '../config/VillainTaunts';
 
 export interface ArenaState {
   player: Ship3D;
   enemies: Ship3D[];
-  enemyAIs: RustyBehavior3D[];
+  enemyAIs: AIBehavior3D[];
   boltPool: BoltPool;
   explosions: ExplosionPool;
+  particles: ParticleSystem3D;
+  environment: LevelEnvironment | null;
   cockpitCam: CockpitCamera;
   touchControls: TouchControls3D;
   mouseControls: MouseControls;
@@ -38,6 +47,17 @@ export interface ArenaState {
   gameOverTime: number;
   victory: boolean;
   victoryTime: number;
+  // Slow-mo kill shot state
+  slowMo: boolean;
+  slowMoTimer: number;
+  slowMoScale: number;
+  // Villain taunt tracking
+  villainIds: string[];
+  spawnTauntFired: boolean;
+  // Pause
+  paused: boolean;
+  // Whether slow-mo kill shot has already been triggered
+  slowMoFired: boolean;
 }
 
 export function createArenaState(
@@ -67,14 +87,20 @@ export function createArenaState(
   // Hide entire player ship — cockpit SVG overlay provides the visual framing
   playerGeo.visible = false;
 
-  // ── Enemies ──
+  // ── Enemies — boss per level index, grunts for extras ──
   const levelConfig = getCurrentLevel();
   const enemies: Ship3D[] = [];
-  const enemyAIs: RustyBehavior3D[] = [];
+  const enemyAIs: AIBehavior3D[] = [];
+  const villainIds: string[] = [];
+
+  // Boss HP multipliers per level
+  const BOSS_HP_MULT: Record<number, number> = { 1: 1.5, 2: 1.2, 3: 2.0 };
 
   for (let i = 0; i < levelConfig.enemyCount; i++) {
     const enemyGeo = createEnemyShipGeometry();
-    enemyGeo.scale.set(3, 3, 3); // triple size for maximum visibility
+    const isBoss = (i === levelConfig.enemyCount - 1); // last enemy is the boss
+    const bossScale = isBoss ? 3.5 : 3;
+    enemyGeo.scale.set(bossScale, bossScale, bossScale);
     applyMaterials(enemyGeo, createEnemyMaterials());
 
     // Spawn at visible mid-range — close enough to see, far enough to chase
@@ -87,31 +113,75 @@ export function createArenaState(
       elevation,
       Math.sin(angle) * dist,
     );
-    // Face toward the player (origin) from spawn — head-on approach
     enemyGeo.lookAt(0, 0, 0);
     scene.add(enemyGeo);
 
+    const hpMult = isBoss ? (BOSS_HP_MULT[level] ?? 1.5) : 1;
     const enemy = new Ship3D({
       group: enemyGeo,
-      maxHull: Math.round(diff.enemyHull * levelConfig.enemySpeedBonus),
-      maxShield: diff.enemyShield,
+      maxHull: Math.round(diff.enemyHull * levelConfig.enemySpeedBonus * hpMult),
+      maxShield: diff.enemyShield * (isBoss ? 1.5 : 1),
       speedMult: diff.enemySpeedMult * levelConfig.enemySpeedBonus,
       rotationMult: diff.enemyRotationMult * levelConfig.enemyRotationBonus,
       isPlayer: false,
     });
     enemies.push(enemy);
 
-    const ai = new RustyBehavior3D(
-      AI.RUSTY_AIM_ACCURACY * levelConfig.enemyRotationBonus,
-      diff.enemyFireRate * levelConfig.enemyFireRateBonus,
-      diff.enemyChaseRange,
-    );
+    // Create the right AI — boss AI for the boss, Rusty for grunts
+    let ai: AIBehavior3D;
+    if (isBoss) {
+      switch (level) {
+        case 1:
+          ai = new BoloTieBehavior3D(
+            AI.RUSTY_AIM_ACCURACY * levelConfig.enemyRotationBonus,
+            diff.enemyFireRate * levelConfig.enemyFireRateBonus,
+            diff.enemyChaseRange,
+          );
+          villainIds.push('bolo_tie');
+          break;
+        case 2:
+          ai = new BowTieBehavior3D(
+            AI.RUSTY_AIM_ACCURACY * levelConfig.enemyRotationBonus,
+            diff.enemyFireRate * levelConfig.enemyFireRateBonus,
+            diff.enemyChaseRange,
+          );
+          villainIds.push('bow_tie');
+          break;
+        case 3:
+          ai = new BishopBehavior3D(
+            AI.RUSTY_AIM_ACCURACY * levelConfig.enemyRotationBonus,
+            diff.enemyFireRate * levelConfig.enemyFireRateBonus,
+            diff.enemyChaseRange,
+          );
+          villainIds.push('bishop');
+          break;
+        default:
+          ai = new RustyBehavior3D(
+            AI.RUSTY_AIM_ACCURACY * levelConfig.enemyRotationBonus,
+            diff.enemyFireRate * levelConfig.enemyFireRateBonus,
+            diff.enemyChaseRange,
+          );
+          villainIds.push('');
+      }
+    } else {
+      ai = new RustyBehavior3D(
+        AI.RUSTY_AIM_ACCURACY * levelConfig.enemyRotationBonus,
+        diff.enemyFireRate * levelConfig.enemyFireRateBonus,
+        diff.enemyChaseRange,
+      );
+      // Grunts use the villain id from earlier levels
+      villainIds.push(i === 0 && level >= 2 ? 'bolo_tie' : i === 1 && level >= 3 ? 'bow_tie' : '');
+    }
     enemyAIs.push(ai);
   }
+
+  // ── Level Environment ──
+  const environment = createLevelEnvironment(scene, level);
 
   // ── Systems ──
   const boltPool = new BoltPool(scene);
   const explosions = new ExplosionPool();
+  const particles = new ParticleSystem3D(scene);
   const cockpitCam = new CockpitCamera(camera);
   const touchControls = new TouchControls3D();
   const mouseControls = new MouseControls();
@@ -121,7 +191,8 @@ export function createArenaState(
 
   return {
     player, enemies, enemyAIs,
-    boltPool, explosions, cockpitCam, touchControls, mouseControls, sound,
+    boltPool, explosions, particles, environment,
+    cockpitCam, touchControls, mouseControls, sound,
     camera,
     score: previousScore,
     levelConfig,
@@ -129,6 +200,13 @@ export function createArenaState(
     gameOverTime: 0,
     victory: false,
     victoryTime: 0,
+    slowMo: false,
+    slowMoTimer: 0,
+    slowMoScale: 1,
+    villainIds,
+    spawnTauntFired: false,
+    paused: false,
+    slowMoFired: false,
   };
 }
 
@@ -137,11 +215,25 @@ export function updateArena(
   keys: Record<string, boolean>,
   dt: number,
   now: number,
+  tauntCallback?: (villainId: string, event: string) => void,
 ): void {
   try {
-  if (state.gameOver || state.victory) return;
+  if (state.paused || state.gameOver || state.victory) return;
 
-  const { player, enemies, enemyAIs, boltPool, explosions, cockpitCam, touchControls, mouseControls } = state;
+  // ── Slow-mo time scaling ──
+  if (state.slowMo) {
+    state.slowMoTimer -= dt;
+    if (state.slowMoTimer <= 0) {
+      state.slowMo = false;
+      state.slowMoScale = 1;
+      state.sound.restoreMusic();
+    } else {
+      state.slowMoScale = 0.3; // 30% speed
+    }
+  }
+  const effectiveDt = dt * state.slowMoScale;
+
+  const { player, enemies, enemyAIs, boltPool, explosions, particles, cockpitCam, touchControls, mouseControls } = state;
 
   // ── Player input ──
   // Desktop: Arrow keys move, Space fires, E=thrust, D=reverse
@@ -151,9 +243,9 @@ export function updateArena(
   // Yaw: ArrowLeft / ArrowRight on desktop, touch joystick X on mobile
   const keyYaw = (keys['ArrowRight'] ? 1 : 0) + (keys['ArrowLeft'] ? -1 : 0);
 
-  // Pitch: ArrowUp = nose up, ArrowDown = nose dive (desktop), joystick Y (mobile)
-  const keyPitch = (keys['ArrowUp'] ? 1 : 0) + (keys['ArrowDown'] ? -1 : 0);
-  const touchPitch = Math.abs(touch.pitch) > 0 ? touch.pitch : 0;
+  // Pitch: ArrowUp = nose DOWN, ArrowDown = nose UP (inverted Y-axis, flight-sim style)
+  const keyPitch = (keys['ArrowUp'] ? -1 : 0) + (keys['ArrowDown'] ? 1 : 0);
+  const touchPitch = Math.abs(touch.pitch) > 0 ? -touch.pitch : 0;
 
   // Thrust: E=forward, D=reverse on desktop, touch buttons on mobile
   const keyThrust = (keys['KeyE'] ? 1 : 0) + (keys['KeyD'] ? -1 : 0);
@@ -184,7 +276,7 @@ export function updateArena(
     const enemy = enemies[i];
     if (!enemy.alive) continue;
 
-    const aiInput = enemyAIs[i].update(enemy, player, dt, now);
+    const aiInput = enemyAIs[i].update(enemy, player, effectiveDt, now);
     if (aiInput.fire) {
       if (tryFireWeapon(enemy, boltPool, now, undefined, player)) {
         state.sound.enemyShoot();
@@ -194,10 +286,10 @@ export function updateArena(
   }
 
   // ── Player physics ──
-  applyShipPhysics(player, input, dt, now);
+  applyShipPhysics(player, input, effectiveDt, now);
 
   // ── Bolts ──
-  boltPool.update(dt);
+  boltPool.update(effectiveDt);
 
   // ── Damage ──
   const allShips = [player, ...enemies];
@@ -314,23 +406,27 @@ export function updateArena(
         }
       }
 
-      // DEATH — world-anchored explosion locked to exact death position
+      // DEATH — world-anchored explosion + destruction chunks + shockwave
       if (!evt.target.alive) {
         if (!evt.target.isPlayer) {
           const deathPos = evt.target.position.clone();
           explosions.spawnDeathWorld(deathPos, state.camera);
+          particles.spawnDestruction(deathPos, 0x1a1a22); // enemy hull color
+          particles.spawnShockwave(deathPos);
           state.score += 500;
           evt.target.group.visible = false;
         }
         state.sound.explosion();
 
         // ── PLAYER DEATH — massive full-screen explosion sequence ──
+        // All effects use a CSS class so clearOverlay can bulk-remove them
         if (evt.target.isPlayer) {
           const overlay = document.getElementById('ui-overlay')!;
           cockpitCam.shake(5.0); // extreme shake
 
           // Blinding white flash
           const whiteFlash = document.createElement('div');
+          whiteFlash.className = 'death-fx';
           whiteFlash.style.cssText = `
             position:fixed;top:0;left:0;width:100%;height:100%;
             background:white;z-index:50;pointer-events:none;
@@ -338,17 +434,19 @@ export function updateArena(
           `;
           overlay.appendChild(whiteFlash);
           requestAnimationFrame(() => { whiteFlash.style.opacity = '0'; });
-          setTimeout(() => whiteFlash.remove(), 1600);
+          setTimeout(() => { if (whiteFlash.parentNode) whiteFlash.remove(); }, 1600);
 
-          // Multiple screen-center explosions — staggered
+          // Multiple screen-center explosions — staggered (guard against stale overlay)
           const cx = window.innerWidth / 2;
           const cy = window.innerHeight / 2;
           for (let i = 0; i < 5; i++) {
             setTimeout(() => {
-              explosions.spawnDeath(
-                cx + (Math.random() - 0.5) * 300,
-                cy + (Math.random() - 0.5) * 200,
-              );
+              if (state.gameOver) { // only spawn if still in gameOver state
+                explosions.spawnDeath(
+                  cx + (Math.random() - 0.5) * 300,
+                  cy + (Math.random() - 0.5) * 200,
+                );
+              }
             }, i * 200);
           }
 
@@ -357,6 +455,7 @@ export function updateArena(
 
           // Red damage vignette that lingers
           const deathVignette = document.createElement('div');
+          deathVignette.className = 'death-fx';
           deathVignette.style.cssText = `
             position:fixed;top:0;left:0;width:100%;height:100%;
             z-index:45;pointer-events:none;
@@ -365,12 +464,15 @@ export function updateArena(
           `;
           overlay.appendChild(deathVignette);
           setTimeout(() => {
-            deathVignette.style.opacity = '0';
-            setTimeout(() => deathVignette.remove(), 2100);
+            if (deathVignette.parentNode) {
+              deathVignette.style.opacity = '0';
+              setTimeout(() => { if (deathVignette.parentNode) deathVignette.remove(); }, 2100);
+            }
           }, 1500);
 
           // Screen crack overlay effect
           const cracks = document.createElement('div');
+          cracks.className = 'death-fx';
           cracks.style.cssText = `
             position:fixed;top:0;left:0;width:100%;height:100%;
             z-index:46;pointer-events:none;
@@ -383,8 +485,10 @@ export function updateArena(
           `;
           overlay.appendChild(cracks);
           setTimeout(() => {
-            cracks.style.opacity = '0';
-            setTimeout(() => cracks.remove(), 3100);
+            if (cracks.parentNode) {
+              cracks.style.opacity = '0';
+              setTimeout(() => { if (cracks.parentNode) cracks.remove(); }, 3100);
+            }
           }, 2000);
         }
       }
@@ -393,21 +497,44 @@ export function updateArena(
     }
   }
 
+  // ── Spawn taunt — only fires once at fight start ──
+  if (tauntCallback && !state.spawnTauntFired) {
+    state.spawnTauntFired = true;
+    const bossIdx = enemies.length - 1;
+    const vid = state.villainIds[bossIdx];
+    if (vid) tauntCallback(vid, 'onSpawn');
+  }
+
   // ── Ship-to-ship collisions ──
-  for (const enemy of enemies) {
+  for (let ci = 0; ci < enemies.length; ci++) {
+    const enemy = enemies[ci];
     if (!enemy.alive) continue;
     if (checkShipCollision(player, enemy, SHIP.HITBOX_RADIUS)) {
+      // Bolo Tie charge = 3x collision damage
+      const ai = enemyAIs[ci];
+      const isCharging = ai instanceof BoloTieBehavior3D && ai.isCharging;
+      if (isCharging) {
+        player.applyDamage(15, now); // extra charge damage
+      }
       resolveShipCollision(player, enemy, SHIP.HITBOX_RADIUS, now);
-      cockpitCam.shake(0.5);
+      cockpitCam.shake(isCharging ? 2.0 : 0.5);
       state.sound.shipCollision();
     }
   }
 
+  // ── Level environment update ──
+  if (state.environment) {
+    state.environment.update(effectiveDt, now, player, enemies, boltPool);
+  }
+
   // ── Explosions ──
-  explosions.update(dt);
+  explosions.update(effectiveDt);
+
+  // ── Particles ──
+  particles.update(effectiveDt);
 
   // ── Camera ──
-  cockpitCam.update(player, dt, input.yaw);
+  cockpitCam.update(player, dt, input.yaw); // camera uses real dt for smooth feel
 
   // ── Win/Lose conditions (with delay for explosions to play) ──
   if (!player.alive && !state.gameOver) {
@@ -418,9 +545,20 @@ export function updateArena(
 
   const allEnemiesDead = enemies.every(e => !e.alive);
   if (allEnemiesDead && !state.victory) {
-    state.victory = true;
-    state.victoryTime = now;
-    state.sound.levelComplete();
+    if (!state.slowMoFired) {
+      // First frame all dead — trigger slow-mo kill shot
+      state.slowMoFired = true;
+      state.slowMo = true;
+      state.slowMoTimer = 1.5;
+      state.slowMoScale = 0.3;
+      state.sound.dropToHum();
+    } else if (!state.slowMo) {
+      // Slow-mo finished — trigger victory
+      state.victory = true;
+      state.victoryTime = now;
+      state.slowMoScale = 1;
+      state.sound.levelComplete();
+    }
   }
   } catch (e) {
     console.error('Arena update error:', e);
@@ -438,4 +576,9 @@ export function cleanupArena(state: ArenaState, scene: THREE.Scene): void {
     scene.remove(bolt.mesh);
     scene.remove(bolt.glow);
   }
+  state.particles.destroy();
+  state.environment?.cleanup();
+  // Safety: clear any fog left by nebula environment
+  scene.fog = null;
 }
+
