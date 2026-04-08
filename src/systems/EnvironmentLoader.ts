@@ -301,15 +301,155 @@ export function createNebulaFog(scene: THREE.Scene): LevelEnvironment {
 }
 
 // ── Level 3: Black Hole ─────────────────────────────────
-// Cinematic Interstellar-style black hole with multi-layered
-// accretion disk, gravitational lensing ring, volumetric glow,
-// swirling gas streams, and real gravity pull.
+// Fiery fantastical black hole — intense orange/yellow swirling
+// accretion disk with turbulent filaments, radial sparks, thick
+// spiral gas arms, volumetric glow, and real gravity pull.
 
 /** Black hole world position — exported so AI behaviors can reference it. */
 export const BLACK_HOLE_POS = new THREE.Vector3(600, -80, -400);
 
-// Helper: generate a canvas texture for a radial disk with color stops
-function makeAccretionTexture(
+// ── GLSL snippets for the accretion disk shader ──
+
+const DISK_VERTEX = /* glsl */ `
+  varying vec2 vUv;
+  void main() {
+    vUv = uv;
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+  }
+`;
+
+const DISK_FRAGMENT = /* glsl */ `
+  uniform float uTime;
+  uniform float uHotSpotAngle;
+  varying vec2 vUv;
+
+  // --- Simplex-style hash noise ---
+  vec2 hash22(vec2 p) {
+    p = vec2(dot(p, vec2(127.1, 311.7)), dot(p, vec2(269.5, 183.3)));
+    return fract(sin(p) * 43758.5453);
+  }
+  float hash21(vec2 p) {
+    return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
+  }
+
+  // --- Value noise ---
+  float vnoise(vec2 p) {
+    vec2 i = floor(p);
+    vec2 f = fract(p);
+    f = f * f * (3.0 - 2.0 * f);
+    float a = hash21(i);
+    float b = hash21(i + vec2(1.0, 0.0));
+    float c = hash21(i + vec2(0.0, 1.0));
+    float d = hash21(i + vec2(1.0, 1.0));
+    return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
+  }
+
+  // --- Fractal Brownian Motion (turbulent organic gas) ---
+  float fbm(vec2 p) {
+    float v = 0.0;
+    float a = 0.5;
+    mat2 rot = mat2(0.8, 0.6, -0.6, 0.8);
+    for (int i = 0; i < 6; i++) {
+      v += a * vnoise(p);
+      p = rot * p * 2.0;
+      a *= 0.5;
+    }
+    return v;
+  }
+
+  // --- Ridged noise (bright filament structures) ---
+  float ridged(vec2 p) {
+    return 1.0 - abs(vnoise(p) * 2.0 - 1.0);
+  }
+  float ridgedFbm(vec2 p) {
+    float v = 0.0;
+    float a = 0.5;
+    mat2 rot = mat2(0.8, 0.6, -0.6, 0.8);
+    for (int i = 0; i < 5; i++) {
+      v += a * ridged(p);
+      p = rot * p * 2.1;
+      a *= 0.5;
+    }
+    return v;
+  }
+
+  // --- Fire color ramp ---
+  vec3 fireColor(float t) {
+    // black → deep red → orange → yellow → white-hot
+    vec3 c0 = vec3(0.05, 0.0, 0.0);   // black/very dark red
+    vec3 c1 = vec3(0.6, 0.1, 0.0);    // deep red
+    vec3 c2 = vec3(1.0, 0.4, 0.0);    // orange
+    vec3 c3 = vec3(1.0, 0.75, 0.2);   // yellow-orange
+    vec3 c4 = vec3(1.0, 0.95, 0.7);   // white-hot
+
+    if (t < 0.2) return mix(c0, c1, t / 0.2);
+    if (t < 0.4) return mix(c1, c2, (t - 0.2) / 0.2);
+    if (t < 0.65) return mix(c2, c3, (t - 0.4) / 0.25);
+    return mix(c3, c4, clamp((t - 0.65) / 0.35, 0.0, 1.0));
+  }
+
+  void main() {
+    // Convert UV to polar: center of disk at (0.5, 0.5)
+    vec2 centered = vUv - 0.5;
+    float dist = length(centered) * 2.0; // 0 at center, 1 at edge
+    float angle = atan(centered.y, centered.x);
+
+    // Inner/outer cutoff
+    float innerR = 0.18;  // black void radius
+    float outerR = 0.95;  // outer fade
+    if (dist < innerR || dist > outerR) discard;
+
+    // Normalized radial position: 0 at inner edge, 1 at outer
+    float radialT = (dist - innerR) / (outerR - innerR);
+
+    // Spiral UV distortion — makes the gas swirl
+    float spiralWind = 3.0; // how tightly wound
+    float spiralAngle = angle + radialT * spiralWind + uTime * 0.15;
+
+    // Sample coordinates for noise
+    vec2 noiseUV = vec2(spiralAngle * 1.2, radialT * 4.0);
+
+    // Base turbulence (large-scale gas structure)
+    float turb = fbm(noiseUV * 3.0 + uTime * 0.08);
+
+    // Bright filaments (ridged noise for tendril structures)
+    float filaments = ridgedFbm(noiseUV * 4.0 + vec2(uTime * 0.05, uTime * 0.12));
+
+    // Combine: turbulence base + bright filament overlay
+    float intensity = turb * 0.6 + filaments * 0.55;
+
+    // Radial brightness: hotter near inner edge, cooler at outer
+    float radialBrightness = 1.0 - radialT * 0.7;
+    intensity *= radialBrightness;
+
+    // Hot spot — concentrated brightness at one angular position
+    float hotSpotDist = 1.0 - smoothstep(0.0, 1.8,
+      abs(mod(angle - uHotSpotAngle + 3.14159, 6.28318) - 3.14159));
+    float hotSpotRadial = smoothstep(0.0, 0.5, radialT) * smoothstep(0.8, 0.3, radialT);
+    intensity += hotSpotDist * hotSpotRadial * 0.5;
+
+    // Extra inner-edge brightness (white-hot ring hugging the void)
+    float innerGlow = smoothstep(0.15, 0.0, radialT) * 1.2;
+    intensity += innerGlow;
+
+    // Clamp and apply fire color ramp
+    intensity = clamp(intensity, 0.0, 1.5);
+    vec3 color = fireColor(intensity);
+
+    // Boost bright areas for bloom to catch
+    color *= 1.0 + intensity * 0.8;
+
+    // Alpha: fade at inner edge (just past void), fade at outer edge
+    float alphaInner = smoothstep(0.0, 0.06, radialT);
+    float alphaOuter = 1.0 - smoothstep(0.75, 1.0, radialT);
+    float alpha = alphaInner * alphaOuter * clamp(intensity * 1.5, 0.0, 1.0);
+
+    gl_FragColor = vec4(color, alpha);
+  }
+`;
+
+// Helper: generate a canvas texture for a radial glow sprite
+function makeGlowTexture(
   size: number,
   stops: Array<{ pos: number; color: string }>,
 ): THREE.CanvasTexture {
@@ -334,12 +474,20 @@ export function createBlackHole(scene: THREE.Scene): LevelEnvironment {
 
   const DISK_TILT = Math.PI * 0.42;
 
-  // ── 1. Outer ambient glow (large, soft, teal-pink nebula wash) ──
-  const outerGlowTex = makeAccretionTexture(512, [
-    { pos: 0, color: 'rgba(180, 140, 200, 0.22)' },
-    { pos: 0.15, color: 'rgba(120, 180, 200, 0.14)' },
-    { pos: 0.35, color: 'rgba(80, 140, 160, 0.07)' },
-    { pos: 0.6, color: 'rgba(40, 60, 80, 0.03)' },
+  // ── 1. Singularity sphere (deep black void) ──
+  const holeGeo = new THREE.SphereGeometry(60, 48, 48);
+  const holeMat = new THREE.MeshBasicMaterial({ color: 0x000000 });
+  const holeMesh = new THREE.Mesh(holeGeo, holeMat);
+  group.add(holeMesh);
+  disposables.push(holeGeo, holeMat);
+
+  // ── 2. Outer volumetric glow (large warm orange wash) ──
+  const outerGlowTex = makeGlowTexture(512, [
+    { pos: 0, color: 'rgba(255, 160, 40, 0.35)' },
+    { pos: 0.12, color: 'rgba(255, 120, 20, 0.25)' },
+    { pos: 0.3, color: 'rgba(200, 70, 5, 0.12)' },
+    { pos: 0.55, color: 'rgba(120, 30, 0, 0.05)' },
+    { pos: 0.8, color: 'rgba(40, 8, 0, 0.02)' },
     { pos: 1, color: 'rgba(0, 0, 0, 0)' },
   ]);
   const outerGlowMat = new THREE.SpriteMaterial({
@@ -347,170 +495,150 @@ export function createBlackHole(scene: THREE.Scene): LevelEnvironment {
     blending: THREE.AdditiveBlending, depthWrite: false,
   });
   const outerGlow = new THREE.Sprite(outerGlowMat);
-  outerGlow.scale.set(900, 900, 1);
+  outerGlow.scale.set(1000, 1000, 1);
   group.add(outerGlow);
   disposables.push(outerGlowTex, outerGlowMat);
 
-  // ── 2. Warm inner glow (orange/amber halo around singularity) ──
-  const warmGlowTex = makeAccretionTexture(512, [
-    { pos: 0, color: 'rgba(255, 200, 120, 0.4)' },
-    { pos: 0.12, color: 'rgba(255, 140, 50, 0.3)' },
-    { pos: 0.3, color: 'rgba(255, 80, 20, 0.15)' },
-    { pos: 0.55, color: 'rgba(160, 40, 10, 0.05)' },
+  // ── 3. Inner intense glow (white-hot core halo) ──
+  const innerGlowTex = makeGlowTexture(512, [
+    { pos: 0, color: 'rgba(255, 240, 180, 0.6)' },
+    { pos: 0.08, color: 'rgba(255, 200, 80, 0.5)' },
+    { pos: 0.2, color: 'rgba(255, 140, 30, 0.3)' },
+    { pos: 0.4, color: 'rgba(255, 80, 5, 0.12)' },
+    { pos: 0.7, color: 'rgba(120, 30, 0, 0.03)' },
     { pos: 1, color: 'rgba(0, 0, 0, 0)' },
   ]);
-  const warmGlowMat = new THREE.SpriteMaterial({
-    map: warmGlowTex, transparent: true,
+  const innerGlowMat = new THREE.SpriteMaterial({
+    map: innerGlowTex, transparent: true,
     blending: THREE.AdditiveBlending, depthWrite: false,
   });
-  const warmGlow = new THREE.Sprite(warmGlowMat);
-  warmGlow.scale.set(550, 550, 1);
-  group.add(warmGlow);
-  disposables.push(warmGlowTex, warmGlowMat);
+  const innerGlow = new THREE.Sprite(innerGlowMat);
+  innerGlow.scale.set(500, 500, 1);
+  group.add(innerGlow);
+  disposables.push(innerGlowTex, innerGlowMat);
 
-  // ── 3. Singularity sphere (deep black, slightly larger for shadow) ──
-  const holeGeo = new THREE.SphereGeometry(55, 48, 48);
-  const holeMat = new THREE.MeshBasicMaterial({ color: 0x000000 });
-  const holeMesh = new THREE.Mesh(holeGeo, holeMat);
-  group.add(holeMesh);
-  disposables.push(holeGeo, holeMat);
-
-  // ── 4. Photon ring (gravitational lensing — thin bright ring) ──
-  const photonGeo = new THREE.TorusGeometry(62, 1.8, 16, 128);
-  const photonMat = new THREE.MeshBasicMaterial({
-    color: 0xffeedd, transparent: true, opacity: 0.85,
-    blending: THREE.AdditiveBlending, depthWrite: false,
+  // ── 4. Shader accretion disk (the main fiery swirl) ──
+  const diskUniforms = {
+    uTime: { value: 0.0 },
+    uHotSpotAngle: { value: -0.8 }, // lower-right hot spot
+  };
+  const diskGeo = new THREE.PlaneGeometry(500, 500, 1, 1);
+  const diskMat = new THREE.ShaderMaterial({
+    uniforms: diskUniforms,
+    vertexShader: DISK_VERTEX,
+    fragmentShader: DISK_FRAGMENT,
+    transparent: true,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+    side: THREE.DoubleSide,
   });
-  const photonRing = new THREE.Mesh(photonGeo, photonMat);
-  photonRing.rotation.x = DISK_TILT;
-  group.add(photonRing);
-  disposables.push(photonGeo, photonMat);
+  const diskMesh = new THREE.Mesh(diskGeo, diskMat);
+  diskMesh.rotation.x = DISK_TILT;
+  group.add(diskMesh);
+  disposables.push(diskGeo, diskMat);
 
-  // Secondary lensing ring (dimmer, slightly larger)
-  const photon2Geo = new THREE.TorusGeometry(68, 1.2, 16, 128);
-  const photon2Mat = new THREE.MeshBasicMaterial({
-    color: 0xccbbff, transparent: true, opacity: 0.4,
-    blending: THREE.AdditiveBlending, depthWrite: false,
+  // ── 5. Second disk layer (offset tilt for volumetric depth) ──
+  const disk2Geo = new THREE.PlaneGeometry(480, 480, 1, 1);
+  const disk2Mat = new THREE.ShaderMaterial({
+    uniforms: {
+      uTime: diskUniforms.uTime, // share time uniform
+      uHotSpotAngle: { value: -0.4 }, // slightly different hot spot
+    },
+    vertexShader: DISK_VERTEX,
+    fragmentShader: DISK_FRAGMENT,
+    transparent: true,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+    side: THREE.DoubleSide,
   });
-  const photonRing2 = new THREE.Mesh(photon2Geo, photon2Mat);
-  photonRing2.rotation.x = DISK_TILT;
-  group.add(photonRing2);
-  disposables.push(photon2Geo, photon2Mat);
-
-  // ── 5. Main accretion disk — canvas-textured ring with gradient ──
-  const diskTexCanvas = document.createElement('canvas');
-  diskTexCanvas.width = 512;
-  diskTexCanvas.height = 64;
-  const dCtx = diskTexCanvas.getContext('2d')!;
-  // Radial color gradient: inner white-hot → orange → deep red → transparent outer
-  const dGrad = dCtx.createLinearGradient(0, 0, 512, 0);
-  dGrad.addColorStop(0, 'rgba(255, 240, 220, 0.9)');   // inner edge: white-hot
-  dGrad.addColorStop(0.08, 'rgba(255, 200, 100, 0.85)');
-  dGrad.addColorStop(0.2, 'rgba(255, 140, 40, 0.7)');
-  dGrad.addColorStop(0.4, 'rgba(220, 80, 15, 0.5)');
-  dGrad.addColorStop(0.6, 'rgba(160, 40, 10, 0.3)');
-  dGrad.addColorStop(0.8, 'rgba(80, 20, 5, 0.12)');
-  dGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
-  dCtx.fillStyle = dGrad;
-  dCtx.fillRect(0, 0, 512, 64);
-  // Add turbulence streaks for visual complexity
-  for (let i = 0; i < 120; i++) {
-    const x = Math.random() * 512;
-    const y = Math.random() * 64;
-    const w = 20 + Math.random() * 60;
-    const bright = Math.random();
-    dCtx.fillStyle = bright > 0.5
-      ? `rgba(255, ${180 + Math.random() * 75}, ${60 + Math.random() * 60}, ${0.15 + Math.random() * 0.2})`
-      : `rgba(${100 + Math.random() * 80}, ${20 + Math.random() * 30}, ${5 + Math.random() * 10}, ${0.1 + Math.random() * 0.15})`;
-    dCtx.fillRect(x, y, w, 1 + Math.random() * 3);
-  }
-
-  const diskTex = new THREE.CanvasTexture(diskTexCanvas);
-  diskTex.wrapS = THREE.RepeatWrapping;
-  diskTex.wrapT = THREE.ClampToEdgeWrapping;
-  const diskGeo = new THREE.RingGeometry(60, 220, 128, 1);
-  // Map UVs so inner→outer maps to left→right of the gradient texture
-  const uvAttr = diskGeo.attributes.uv;
-  const posAttr = diskGeo.attributes.position;
-  for (let i = 0; i < posAttr.count; i++) {
-    const x = posAttr.getX(i);
-    const z = posAttr.getY(i); // RingGeometry is in XY plane
-    const r = Math.sqrt(x * x + z * z);
-    const t = (r - 60) / (220 - 60); // 0 at inner edge, 1 at outer
-    const angle = Math.atan2(z, x);
-    uvAttr.setXY(i, angle / (Math.PI * 2) + 0.5, t);
-  }
-
-  const diskMat = new THREE.MeshBasicMaterial({
-    map: diskTex, transparent: true, side: THREE.DoubleSide,
-    blending: THREE.AdditiveBlending, depthWrite: false,
-  });
-  const disk = new THREE.Mesh(diskGeo, diskMat);
-  disk.rotation.x = DISK_TILT;
-  group.add(disk);
-  disposables.push(diskTex, diskGeo, diskMat);
-
-  // ── 6. Secondary disk layer (slightly different tilt for depth) ──
-  const disk2Geo = new THREE.RingGeometry(65, 200, 96, 1);
-  const disk2Mat = new THREE.MeshBasicMaterial({
-    color: 0xff9944, transparent: true, opacity: 0.2,
-    side: THREE.DoubleSide, blending: THREE.AdditiveBlending, depthWrite: false,
-  });
-  const disk2 = new THREE.Mesh(disk2Geo, disk2Mat);
-  disk2.rotation.x = DISK_TILT + 0.08; // slightly offset tilt
-  disk2.rotation.z = 0.3;
-  group.add(disk2);
+  const disk2Mesh = new THREE.Mesh(disk2Geo, disk2Mat);
+  disk2Mesh.rotation.x = DISK_TILT + 0.12;
+  disk2Mesh.rotation.z = 0.25;
+  group.add(disk2Mesh);
   disposables.push(disk2Geo, disk2Mat);
 
-  // ── 7. Inner bright accretion edge (white-hot ring) ──
-  const innerEdgeGeo = new THREE.RingGeometry(56, 66, 128);
-  const innerEdgeMat = new THREE.MeshBasicMaterial({
-    color: 0xffeedd, transparent: true, opacity: 0.6,
-    side: THREE.DoubleSide, blending: THREE.AdditiveBlending, depthWrite: false,
-  });
-  const innerEdge = new THREE.Mesh(innerEdgeGeo, innerEdgeMat);
-  innerEdge.rotation.x = DISK_TILT;
-  group.add(innerEdge);
-  disposables.push(innerEdgeGeo, innerEdgeMat);
+  // ── 6. Thick spiral gas filament tubes (bright orange tendrils) ──
+  const filamentGroup = new THREE.Group();
+  filamentGroup.rotation.x = DISK_TILT;
+  const FILAMENT_COUNT = 14;
+  for (let w = 0; w < FILAMENT_COUNT; w++) {
+    const startAngle = (w / FILAMENT_COUNT) * Math.PI * 2 + Math.random() * 0.4;
+    const startR = 65 + Math.random() * 20;
+    const windFactor = 1.8 + Math.random() * 1.2; // tighter spirals
+    const points: THREE.Vector3[] = [];
+    for (let p = 0; p < 30; p++) {
+      const t = p / 29;
+      const a = startAngle + t * Math.PI * windFactor;
+      const r = startR + t * (60 + Math.random() * 80);
+      const h = (Math.random() - 0.5) * 12 * (1 - t * 0.7);
+      points.push(new THREE.Vector3(Math.cos(a) * r, h, Math.sin(a) * r));
+    }
+    const curve = new THREE.CatmullRomCurve3(points);
+    const thickness = 2.5 + Math.random() * 4;
+    const tubeGeo = new THREE.TubeGeometry(curve, 40, thickness, 8, false);
+    // Color: mix of bright orange, yellow-orange, and hot yellow
+    const colorRoll = Math.random();
+    const wColor = colorRoll < 0.3 ? 0xffaa22
+      : colorRoll < 0.6 ? 0xffcc44
+      : colorRoll < 0.85 ? 0xff7711
+      : 0xffdd66;
+    const tubeMat = new THREE.MeshBasicMaterial({
+      color: wColor, transparent: true,
+      opacity: 0.2 + Math.random() * 0.2,
+      blending: THREE.AdditiveBlending, depthWrite: false,
+    });
+    const wispMesh = new THREE.Mesh(tubeGeo, tubeMat);
+    filamentGroup.add(wispMesh);
+    disposables.push(tubeGeo, tubeMat);
+  }
+  group.add(filamentGroup);
 
-  // ── 8. Gas stream particles (swirling matter spiraling inward) ──
-  const STREAM_COUNT = 280;
+  // ── 7. Inner bright filament ring (white-hot edge around void) ──
+  const innerRingGeo = new THREE.TorusGeometry(64, 3.5, 16, 128);
+  const innerRingMat = new THREE.MeshBasicMaterial({
+    color: 0xffeeaa, transparent: true, opacity: 0.7,
+    blending: THREE.AdditiveBlending, depthWrite: false,
+  });
+  const innerRing = new THREE.Mesh(innerRingGeo, innerRingMat);
+  innerRing.rotation.x = DISK_TILT;
+  group.add(innerRing);
+  disposables.push(innerRingGeo, innerRingMat);
+
+  // Thin secondary inner ring
+  const innerRing2Geo = new THREE.TorusGeometry(68, 2, 16, 128);
+  const innerRing2Mat = new THREE.MeshBasicMaterial({
+    color: 0xffcc66, transparent: true, opacity: 0.5,
+    blending: THREE.AdditiveBlending, depthWrite: false,
+  });
+  const innerRing2 = new THREE.Mesh(innerRing2Geo, innerRing2Mat);
+  innerRing2.rotation.x = DISK_TILT;
+  group.add(innerRing2);
+  disposables.push(innerRing2Geo, innerRing2Mat);
+
+  // ── 8. Swirling gas stream particles (spiral inward) ──
+  const STREAM_COUNT = 400;
   const streamGeo = new THREE.BufferGeometry();
   const streamPositions = new Float32Array(STREAM_COUNT * 3);
   const streamColors = new Float32Array(STREAM_COUNT * 3);
-  const streamSizes = new Float32Array(STREAM_COUNT);
-  // Per-particle state for animation
   const streamAngles = new Float32Array(STREAM_COUNT);
   const streamRadii = new Float32Array(STREAM_COUNT);
   const streamSpeeds = new Float32Array(STREAM_COUNT);
   const streamHeights = new Float32Array(STREAM_COUNT);
 
   for (let i = 0; i < STREAM_COUNT; i++) {
-    const angle = Math.random() * Math.PI * 2;
-    const radius = 60 + Math.random() * 180;
-    const height = (Math.random() - 0.5) * 30 * (1 - (radius - 60) / 180);
-    streamAngles[i] = angle;
-    streamRadii[i] = radius;
-    streamSpeeds[i] = 0.15 + Math.random() * 0.35;
-    streamHeights[i] = height;
-
-    // Color: inner particles are hotter (white/yellow), outer are cooler (red/dark)
-    const t = (radius - 60) / 180;
-    const r = 1;
-    const g = 0.3 + (1 - t) * 0.6;
-    const b = (1 - t) * 0.4;
-    streamColors[i * 3] = r;
-    streamColors[i * 3 + 1] = g;
-    streamColors[i * 3 + 2] = b;
-
-    streamSizes[i] = 2 + Math.random() * 4 * (1 - t * 0.6);
+    streamAngles[i] = Math.random() * Math.PI * 2;
+    streamRadii[i] = 60 + Math.random() * 200;
+    streamSpeeds[i] = 0.2 + Math.random() * 0.4;
+    streamHeights[i] = (Math.random() - 0.5) * 25;
+    const t = (streamRadii[i] - 60) / 200;
+    streamColors[i * 3] = 1.0;
+    streamColors[i * 3 + 1] = 0.5 + (1 - t) * 0.45;
+    streamColors[i * 3 + 2] = (1 - t) * 0.3;
   }
   streamGeo.setAttribute('position', new THREE.BufferAttribute(streamPositions, 3));
   streamGeo.setAttribute('color', new THREE.BufferAttribute(streamColors, 3));
-  streamGeo.setAttribute('size', new THREE.BufferAttribute(streamSizes, 1));
-
   const streamMat = new THREE.PointsMaterial({
-    size: 4, vertexColors: true, transparent: true, opacity: 0.6,
+    size: 3.5, vertexColors: true, transparent: true, opacity: 0.7,
     blending: THREE.AdditiveBlending, depthWrite: false, sizeAttenuation: true,
   });
   const streamPoints = new THREE.Points(streamGeo, streamMat);
@@ -518,49 +646,52 @@ export function createBlackHole(scene: THREE.Scene): LevelEnvironment {
   group.add(streamPoints);
   disposables.push(streamGeo, streamMat);
 
-  // ── 9. Tidal gas wisps (long curved streaks of matter) ──
-  const wispGroup = new THREE.Group();
-  wispGroup.rotation.x = DISK_TILT;
-  const wisps: THREE.Mesh[] = [];
-  for (let w = 0; w < 6; w++) {
-    const curve = new THREE.CatmullRomCurve3([]);
-    const startAngle = (w / 6) * Math.PI * 2 + Math.random() * 0.5;
-    const startR = 70 + Math.random() * 40;
-    const points: THREE.Vector3[] = [];
-    for (let p = 0; p < 20; p++) {
-      const t = p / 19;
-      const a = startAngle + t * Math.PI * 1.5 * (0.8 + Math.random() * 0.4);
-      const r = startR + t * (100 + Math.random() * 60);
-      const h = (Math.random() - 0.5) * 8 * (1 - t);
-      points.push(new THREE.Vector3(Math.cos(a) * r, h, Math.sin(a) * r));
-    }
-    curve.points = points;
-    const tubeGeo = new THREE.TubeGeometry(curve, 30, 1.5 + Math.random() * 2, 6, false);
-    const hue = Math.random();
-    const wColor = hue < 0.4 ? 0xff8833 : hue < 0.7 ? 0xffaa55 : 0xcc6622;
-    const tubeMat = new THREE.MeshBasicMaterial({
-      color: wColor, transparent: true, opacity: 0.15 + Math.random() * 0.1,
-      blending: THREE.AdditiveBlending, depthWrite: false,
-    });
-    const wispMesh = new THREE.Mesh(tubeGeo, tubeMat);
-    wispGroup.add(wispMesh);
-    wisps.push(wispMesh);
-    disposables.push(tubeGeo, tubeMat);
-  }
-  group.add(wispGroup);
+  // ── 9. Radial spark particles (ejected outward from disk) ──
+  const SPARK_COUNT = 500;
+  const sparkGeo = new THREE.BufferGeometry();
+  const sparkPositions = new Float32Array(SPARK_COUNT * 3);
+  const sparkColors = new Float32Array(SPARK_COUNT * 3);
+  const sparkAngles = new Float32Array(SPARK_COUNT);
+  const sparkRadii = new Float32Array(SPARK_COUNT);
+  const sparkSpeeds = new Float32Array(SPARK_COUNT); // outward velocity
+  const sparkHeights = new Float32Array(SPARK_COUNT);
+  const sparkLife = new Float32Array(SPARK_COUNT); // 0-1 lifecycle
 
-  // ── 10. Warm + cool point lights ──
-  const warmLight = new THREE.PointLight(0xff6600, 2.5, 900);
+  for (let i = 0; i < SPARK_COUNT; i++) {
+    sparkAngles[i] = Math.random() * Math.PI * 2;
+    sparkRadii[i] = 70 + Math.random() * 60;
+    sparkSpeeds[i] = 30 + Math.random() * 120; // fast outward
+    sparkHeights[i] = (Math.random() - 0.5) * 40;
+    sparkLife[i] = Math.random(); // start at random point in lifecycle
+    // Bright orange-yellow-white sparks
+    const bright = 0.6 + Math.random() * 0.4;
+    sparkColors[i * 3] = 1.0;
+    sparkColors[i * 3 + 1] = 0.5 + bright * 0.4;
+    sparkColors[i * 3 + 2] = bright * 0.3;
+  }
+  sparkGeo.setAttribute('position', new THREE.BufferAttribute(sparkPositions, 3));
+  sparkGeo.setAttribute('color', new THREE.BufferAttribute(sparkColors, 3));
+  const sparkMat = new THREE.PointsMaterial({
+    size: 2.0, vertexColors: true, transparent: true, opacity: 0.8,
+    blending: THREE.AdditiveBlending, depthWrite: false, sizeAttenuation: true,
+  });
+  const sparkPoints = new THREE.Points(sparkGeo, sparkMat);
+  sparkPoints.rotation.x = DISK_TILT;
+  group.add(sparkPoints);
+  disposables.push(sparkGeo, sparkMat);
+
+  // ── 10. Warm point lights ──
+  const warmLight = new THREE.PointLight(0xff7700, 3.5, 1000);
   group.add(warmLight);
-  const coolLight = new THREE.PointLight(0x4488aa, 0.8, 600);
-  coolLight.position.set(0, 60, 0);
-  group.add(coolLight);
+  const warmLight2 = new THREE.PointLight(0xffaa33, 1.5, 600);
+  warmLight2.position.set(40, -20, 30);
+  group.add(warmLight2);
 
   scene.add(group);
 
   // ── Gravity — pulls ships that fly close ──
   const GRAVITY_STRENGTH = 600;
-  const EVENT_HORIZON = 55;
+  const EVENT_HORIZON = 60; // match singularity radius
   const MAX_EFFECT_DIST = 600;
   const _toHole = new THREE.Vector3();
 
@@ -580,20 +711,23 @@ export function createBlackHole(scene: THREE.Scene): LevelEnvironment {
   }
 
   function update(dt: number, now: number, player: Ship3D, enemies: Ship3D[]): void {
-    // Rotate accretion disk layers at different speeds
-    disk.rotation.z += dt * 0.06;
-    disk2.rotation.z -= dt * 0.03;
-    innerEdge.rotation.z += dt * 0.08;
-    wispGroup.rotation.y += dt * 0.015;
+    // Advance shader time
+    diskUniforms.uTime.value = now;
+
+    // Rotate filament tubes slowly
+    filamentGroup.rotation.y += dt * 0.02;
+
+    // Rotate inner rings at different speeds
+    innerRing.rotation.z += dt * 0.08;
+    innerRing2.rotation.z -= dt * 0.05;
 
     // Animate stream particles — spiral inward
     const posArr = streamGeo.attributes.position.array as Float32Array;
     for (let i = 0; i < STREAM_COUNT; i++) {
-      streamAngles[i] += dt * streamSpeeds[i] * (200 / Math.max(streamRadii[i], 60));
-      // Slowly drift inward
-      streamRadii[i] -= dt * 2;
+      streamAngles[i] += dt * streamSpeeds[i] * (180 / Math.max(streamRadii[i], 60));
+      streamRadii[i] -= dt * 3; // drift inward
       if (streamRadii[i] < 58) {
-        streamRadii[i] = 120 + Math.random() * 120;
+        streamRadii[i] = 140 + Math.random() * 120;
         streamAngles[i] = Math.random() * Math.PI * 2;
       }
       const a = streamAngles[i];
@@ -604,13 +738,33 @@ export function createBlackHole(scene: THREE.Scene): LevelEnvironment {
     }
     streamGeo.attributes.position.needsUpdate = true;
 
-    // Pulsing photon ring
-    const pulse = 0.7 + 0.3 * Math.sin(now * 1.5);
-    photonMat.opacity = 0.6 + 0.25 * pulse;
-    photon2Mat.opacity = 0.25 + 0.15 * Math.sin(now * 2.1 + 1);
+    // Animate spark particles — radiate outward
+    const sparkPosArr = sparkGeo.attributes.position.array as Float32Array;
+    for (let i = 0; i < SPARK_COUNT; i++) {
+      sparkLife[i] += dt * (0.3 + sparkSpeeds[i] * 0.003);
+      if (sparkLife[i] > 1) {
+        // Respawn at inner disk edge
+        sparkLife[i] = 0;
+        sparkAngles[i] = Math.random() * Math.PI * 2;
+        sparkRadii[i] = 70 + Math.random() * 40;
+        sparkHeights[i] = (Math.random() - 0.5) * 20;
+        sparkSpeeds[i] = 30 + Math.random() * 120;
+      }
+      // Outward radial motion
+      const currentR = sparkRadii[i] + sparkLife[i] * sparkSpeeds[i];
+      const a = sparkAngles[i] + sparkLife[i] * 0.3; // slight spiral
+      sparkPosArr[i * 3] = Math.cos(a) * currentR;
+      sparkPosArr[i * 3 + 1] = sparkHeights[i] * (1 - sparkLife[i] * 0.5);
+      sparkPosArr[i * 3 + 2] = Math.sin(a) * currentR;
+    }
+    sparkGeo.attributes.position.needsUpdate = true;
 
-    // Gentle warm light flicker
-    warmLight.intensity = 2.2 + 0.5 * Math.sin(now * 0.8);
+    // Pulsing inner ring
+    innerRingMat.opacity = 0.55 + 0.2 * Math.sin(now * 1.8);
+
+    // Flickering warm lights
+    warmLight.intensity = 3.0 + 1.0 * Math.sin(now * 0.9);
+    warmLight2.intensity = 1.3 + 0.5 * Math.sin(now * 1.4 + 1.0);
 
     applyGravity(player, dt);
     for (const enemy of enemies) {
