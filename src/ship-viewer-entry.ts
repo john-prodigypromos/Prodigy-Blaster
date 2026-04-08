@@ -3,13 +3,14 @@ import { createEnemyShipGeometry, createPlayerShipGeometry } from './ships/ShipG
 import { createPlayerMaterials, createEnemyMaterials, applyMaterials } from './ships/ShipMaterials';
 import { createAsteroidMesh } from './systems/EnvironmentLoader';
 import { createPlanet as createPlanetFromProfile, PLANET_COUNT } from './renderer/Environment';
+import { createCanyonTerrain, type CanyonTerrain } from './terrain/CanyonGeometry';
 
 // ── Scene ──
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x080e18);
 
 // Camera
-const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100000);
+const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 1, 3000000);
 
 // Renderer
 const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -59,7 +60,7 @@ let spinning = true;
 let updateFn: ((dt: number, now: number) => void) | null = null;
 let cleanupExtras: (() => void) | null = null;
 
-type ViewerObject = 'player' | 'enemy' | 'asteroid' | 'blackhole' | 'planet' | 'moon';
+type ViewerObject = 'player' | 'enemy' | 'asteroid' | 'blackhole' | 'planet' | 'moon' | 'marsbase';
 
 // Per-object orbit distances
 const ORBIT_DIST: Record<ViewerObject, number> = {
@@ -69,15 +70,17 @@ const ORBIT_DIST: Record<ViewerObject, number> = {
   blackhole: 600,
   planet: 1000,
   moon: 220,
+  marsbase: 25000,
 };
 
 const DESCRIPTIONS: Record<ViewerObject, string> = {
   player: 'Swept-wing fighter with dual nacelles, dorsal 3rd engine, and cockpit canopy. PBR metallic hull with character-tinted accent.',
   enemy: 'Dark gunmetal interceptor with red accent lighting. Menacing cockpit slit, twin engines, and darker armor panels.',
   asteroid: 'Multi-octave noise displacement over icosahedron. Craggy rock with craters, color variation, and flat shading.',
-  blackhole: 'Singularity sphere with dual-layer shader accretion disk (fbm + ridged noise). Spiral gas filaments, stream particles, radial sparks, and volumetric glow.',
-  planet: 'Venus-class gas giant with 8K surface texture, dual atmosphere shells, and terminator shadow.',
-  moon: 'Icy satellite with procedural crater texture, fracture lines, and thin blue atmosphere.',
+  blackhole: 'Singularity sphere with dual-layer shader accretion disk (fbm + ridged noise). Stream particles, radial sparks, and volumetric glow.',
+  planet: 'Procedural planet with atmosphere shell. 5 types cycle on click.',
+  moon: 'Icy satellite with procedural crater texture and fracture lines.',
+  marsbase: 'Mars canyon with geodesic dome colony on a textured planet sphere. The launch site.',
 };
 
 function clearCurrent() {
@@ -521,6 +524,38 @@ function setLighting(mode: 'ship' | 'blackhole' | 'planet') {
   }
 }
 
+// ── Mars Base loader ──
+let canyonRef: CanyonTerrain | null = null;
+
+function loadMarsBase() {
+  clearCurrent();
+  if (canyonRef) {
+    canyonRef.cleanup();
+    canyonRef = null;
+  }
+
+  canyonRef = createCanyonTerrain(scene, 42);
+  scene.add(canyonRef.group);
+  currentGroup = canyonRef.group;
+  // Orbit around the canyon center (canyon is centered at origin, floor at y=0)
+  // Camera will orbit looking at a point above the canyon floor
+  grid.visible = false;
+  setLighting('planet');
+  // Brighter Mars sun
+  keyLight.position.set(3000, 2000, -1000);
+  keyLight.intensity = 2.0;
+  ambientLight.intensity = 0.5;
+
+  updateFn = null; // static scene, just orbit
+  // Override cleanup to also clean canyon
+  cleanupExtras = () => {
+    if (canyonRef) {
+      canyonRef.cleanup();
+      canyonRef = null;
+    }
+  };
+}
+
 // ── Loader dispatch ──
 const loaders: Record<ViewerObject, () => void> = {
   player: () => loadShip('player'),
@@ -529,6 +564,7 @@ const loaders: Record<ViewerObject, () => void> = {
   blackhole: loadBlackHole,
   planet: loadPlanet,
   moon: loadMoon,
+  marsbase: loadMarsBase,
 };
 
 let currentType: ViewerObject = 'player';
@@ -544,6 +580,7 @@ function switchTo(type: ViewerObject) {
     blackhole: 'BLACK HOLE',
     planet: 'VENUS PLANET',
     moon: 'ICE MOON',
+    marsbase: 'MARS BASE',
   }[type];
   document.getElementById('info')!.textContent = DESCRIPTIONS[type];
 
@@ -573,8 +610,8 @@ window.addEventListener('pointermove', (e) => {
   prevMouse = { x: e.clientX, y: e.clientY };
 });
 renderer.domElement.addEventListener('wheel', (e) => {
-  const min = ORBIT_DIST[currentType] * 0.3;
-  const max = ORBIT_DIST[currentType] * 3;
+  const min = ORBIT_DIST[currentType] * 0.1;
+  const max = ORBIT_DIST[currentType] * 10;
   orbitDist = Math.max(min, Math.min(max, orbitDist + e.deltaY * orbitDist * 0.001));
 });
 
@@ -609,7 +646,7 @@ function animate() {
 animate();
 
 // ── Button handlers ──
-for (const type of ['player', 'enemy', 'asteroid', 'blackhole', 'planet', 'moon'] as ViewerObject[]) {
+for (const type of ['player', 'enemy', 'asteroid', 'blackhole', 'planet', 'moon', 'marsbase'] as ViewerObject[]) {
   document.getElementById(`btn-${type}`)?.addEventListener('click', () => switchTo(type));
 }
 

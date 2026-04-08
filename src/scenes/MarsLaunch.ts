@@ -56,7 +56,7 @@ export function createMarsLaunch(
   const charColor = CHARACTERS[currentCharacter]?.color ?? COLORS.player;
   const playerGeo = createPlayerShipGeometry();
   applyMaterials(playerGeo, createPlayerMaterials(charColor));
-  playerGeo.position.set(0, 2, -8000); // deep inside the canyon (near the far end)
+  playerGeo.position.set(0, 15, -8000); // on the pad, deep inside the canyon
   playerGeo.visible = false;
   scene.add(playerGeo);
 

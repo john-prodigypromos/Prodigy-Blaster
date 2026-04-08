@@ -520,13 +520,14 @@ function createCorridor(x1: number, z1: number, x2: number, z2: number, tubeRadi
 export function createBaseColony(): THREE.Group {
   const group = new THREE.Group();
 
-  // Dome positions and sizes [radius, x, z]
+  // Dome positions and sizes [radius, x, z] — near player start at z=-8000
+  const bz = -8000; // base Z, matching player spawn
   const domes: [number, number, number][] = [
-    [25, -50, -40],    // large central dome
-    [18, -90, -30],    // medium left
-    [15, -40, -80],    // medium right-back
-    [20, -80, -75],    // medium far
-    [12, -110, -60],   // small far-left
+    [25, -50, bz - 40],    // large central dome
+    [18, -90, bz - 30],    // medium left
+    [15, -40, bz - 80],    // medium right-back
+    [20, -80, bz - 75],    // medium far
+    [12, -110, bz - 60],   // small far-left
   ];
 
   for (const [r, x, z] of domes) {
@@ -534,11 +535,11 @@ export function createBaseColony(): THREE.Group {
   }
 
   // Connecting corridors between adjacent domes
-  group.add(createCorridor(-50, -40, -90, -30, 3));   // central → left
-  group.add(createCorridor(-50, -40, -40, -80, 3));   // central → right-back
-  group.add(createCorridor(-90, -30, -80, -75, 2.5)); // left → far
-  group.add(createCorridor(-90, -30, -110, -60, 2));  // left → far-left
-  group.add(createCorridor(-80, -75, -40, -80, 2.5)); // far → right-back
+  group.add(createCorridor(-50, bz - 40, -90, bz - 30, 3));
+  group.add(createCorridor(-50, bz - 40, -40, bz - 80, 3));
+  group.add(createCorridor(-90, bz - 30, -80, bz - 75, 2.5));
+  group.add(createCorridor(-90, bz - 30, -110, bz - 60, 2));
+  group.add(createCorridor(-80, bz - 75, -40, bz - 80, 2.5));
 
   // Flat pad area under the colony
   const padGeo = new THREE.CircleGeometry(80, 32);
@@ -549,7 +550,7 @@ export function createBaseColony(): THREE.Group {
     metalness: 0.2,
   });
   const pad = new THREE.Mesh(padGeo, padMat);
-  pad.position.set(-70, 0.1, -55);
+  pad.position.set(-70, 0.1, bz - 55);
   group.add(pad);
 
   return group;
@@ -585,80 +586,168 @@ export function createCanyonTerrain(
   const colony = createBaseColony();
   group.add(colony);
 
-  // ── Mars planet sphere — massive textured surface ──
-  const MARS_RADIUS = 100000;
-  const marsGeo = new THREE.SphereGeometry(MARS_RADIUS, 128, 96);
+  // ── Mars surface — 4 plane segments around the canyon slot ──
+  // No ShapeGeometry holes (causes triangulation artifacts).
+  // Instead: left plane, right plane, front cap, back cap.
+  const SURFACE_EXTENT = 100000;
+  const slotHalfW = config.topWidth + 10;
+  const slotHalfZ = config.length / 2 + 50;
+  const surfaceY = config.wallHeight;
 
-  // Procedural Mars surface texture
-  const texW = 2048, texH = 1024;
+  // ── Procedural Mars surface texture ──
+  const texSize = 2048;
   const marsCanvas = document.createElement('canvas');
-  marsCanvas.width = texW; marsCanvas.height = texH;
+  marsCanvas.width = texSize; marsCanvas.height = texSize;
   const mCtx = marsCanvas.getContext('2d')!;
-
-  // Base rusty red
-  mCtx.fillStyle = '#8b3a1a';
-  mCtx.fillRect(0, 0, texW, texH);
-
-  // Large dark highland regions
   let _ms = seed + 777;
   const _mr = () => { _ms = (_ms * 16807 + 7) % 2147483647; return (_ms - 1) / 2147483646; };
-  for (let i = 0; i < 60; i++) {
-    const cx = _mr() * texW, cy = _mr() * texH, cr = 30 + _mr() * 200;
-    const g = mCtx.createRadialGradient(cx, cy, cr * 0.1, cx, cy, cr);
-    g.addColorStop(0, `rgba(60, 20, 8, ${0.15 + _mr() * 0.2})`);
-    g.addColorStop(0.6, `rgba(80, 30, 12, ${0.05 + _mr() * 0.1})`);
-    g.addColorStop(1, 'rgba(80, 30, 12, 0)');
+
+  // Base: varied rusty terrain
+  const baseGrad = mCtx.createRadialGradient(texSize * 0.4, texSize * 0.5, 0, texSize * 0.5, texSize * 0.5, texSize * 0.7);
+  baseGrad.addColorStop(0, '#8a5030');
+  baseGrad.addColorStop(0.3, '#7a4528');
+  baseGrad.addColorStop(0.6, '#6a3a20');
+  baseGrad.addColorStop(1, '#5a3018');
+  mCtx.fillStyle = baseGrad;
+  mCtx.fillRect(0, 0, texSize, texSize);
+
+  // Large dark highland/volcanic regions
+  for (let i = 0; i < 80; i++) {
+    const cx = _mr() * texSize, cy = _mr() * texSize;
+    const cr = 20 + _mr() * 250;
+    const g = mCtx.createRadialGradient(cx, cy, cr * 0.05, cx, cy, cr);
+    const dark = _mr() > 0.5;
+    g.addColorStop(0, dark ? `rgba(35, 15, 8, ${0.2 + _mr() * 0.25})` : `rgba(140, 80, 40, ${0.1 + _mr() * 0.15})`);
+    g.addColorStop(0.5, dark ? `rgba(45, 20, 10, ${0.1 + _mr() * 0.1})` : `rgba(120, 70, 35, ${0.05})`);
+    g.addColorStop(1, 'rgba(0, 0, 0, 0)');
     mCtx.fillStyle = g;
     mCtx.beginPath(); mCtx.arc(cx, cy, cr, 0, Math.PI * 2); mCtx.fill();
   }
 
-  // Lighter dust plains
-  for (let i = 0; i < 40; i++) {
-    const cx = _mr() * texW, cy = _mr() * texH, cr = 40 + _mr() * 150;
-    const g = mCtx.createRadialGradient(cx, cy, cr * 0.2, cx, cy, cr);
-    g.addColorStop(0, `rgba(180, 100, 50, ${0.08 + _mr() * 0.12})`);
-    g.addColorStop(1, 'rgba(180, 100, 50, 0)');
-    mCtx.fillStyle = g;
-    mCtx.beginPath(); mCtx.arc(cx, cy, cr, 0, Math.PI * 2); mCtx.fill();
-  }
-
-  // Impact craters
-  for (let i = 0; i < 30; i++) {
-    const cx = _mr() * texW, cy = _mr() * texH, cr = 5 + _mr() * 40;
-    mCtx.strokeStyle = `rgba(50, 18, 8, ${0.2 + _mr() * 0.2})`;
-    mCtx.lineWidth = 1 + _mr() * 2;
-    mCtx.beginPath(); mCtx.arc(cx, cy, cr, 0, Math.PI * 2); mCtx.stroke();
-    // Crater shadow
-    const sg = mCtx.createRadialGradient(cx - cr * 0.2, cy - cr * 0.2, 0, cx, cy, cr * 0.8);
-    sg.addColorStop(0, `rgba(40, 15, 5, ${0.1 + _mr() * 0.1})`);
-    sg.addColorStop(1, 'rgba(40, 15, 5, 0)');
+  // Impact craters with rims and shadows
+  for (let i = 0; i < 50; i++) {
+    const cx = _mr() * texSize, cy = _mr() * texSize;
+    const cr = 3 + _mr() * 60;
+    // Shadow inside
+    const sg = mCtx.createRadialGradient(cx - cr * 0.15, cy - cr * 0.15, 0, cx, cy, cr);
+    sg.addColorStop(0, `rgba(30, 12, 6, ${0.15 + _mr() * 0.2})`);
+    sg.addColorStop(0.6, `rgba(40, 18, 8, ${0.05})`);
+    sg.addColorStop(1, 'rgba(0, 0, 0, 0)');
     mCtx.fillStyle = sg;
-    mCtx.beginPath(); mCtx.arc(cx, cy, cr * 0.8, 0, Math.PI * 2); mCtx.fill();
+    mCtx.beginPath(); mCtx.arc(cx, cy, cr, 0, Math.PI * 2); mCtx.fill();
+    // Bright rim (ejecta)
+    mCtx.strokeStyle = `rgba(160, 100, 60, ${0.1 + _mr() * 0.15})`;
+    mCtx.lineWidth = 1 + _mr() * 3;
+    mCtx.beginPath(); mCtx.arc(cx, cy, cr, 0, Math.PI * 2); mCtx.stroke();
+    // Ejecta rays on larger craters
+    if (cr > 25) {
+      const rays = 4 + Math.floor(_mr() * 5);
+      for (let r = 0; r < rays; r++) {
+        const angle = _mr() * Math.PI * 2;
+        const rayLen = cr * (1.5 + _mr() * 2);
+        mCtx.strokeStyle = `rgba(150, 95, 55, ${0.04 + _mr() * 0.06})`;
+        mCtx.lineWidth = 1 + _mr() * 2;
+        mCtx.beginPath();
+        mCtx.moveTo(cx + Math.cos(angle) * cr, cy + Math.sin(angle) * cr);
+        mCtx.lineTo(cx + Math.cos(angle) * rayLen, cy + Math.sin(angle) * rayLen);
+        mCtx.stroke();
+      }
+    }
   }
 
-  // Polar ice caps (white at top/bottom of texture)
-  for (const yBase of [0, texH - 60]) {
-    const capG = mCtx.createLinearGradient(0, yBase, 0, yBase + (yBase === 0 ? 60 : 0));
-    capG.addColorStop(0, yBase === 0 ? 'rgba(200, 180, 160, 0.35)' : 'rgba(200, 180, 160, 0)');
-    capG.addColorStop(1, yBase === 0 ? 'rgba(200, 180, 160, 0)' : 'rgba(200, 180, 160, 0.35)');
-    mCtx.fillStyle = capG;
-    mCtx.fillRect(0, yBase, texW, 60);
+  // Channel/valley features (ancient river beds)
+  for (let i = 0; i < 8; i++) {
+    mCtx.strokeStyle = `rgba(50, 22, 10, ${0.08 + _mr() * 0.1})`;
+    mCtx.lineWidth = 2 + _mr() * 5;
+    mCtx.beginPath();
+    let cx = _mr() * texSize, cy = _mr() * texSize;
+    mCtx.moveTo(cx, cy);
+    for (let s = 0; s < 6; s++) {
+      cx += (_mr() - 0.5) * 300;
+      cy += (_mr() - 0.5) * 300;
+      mCtx.quadraticCurveTo(cx + (_mr() - 0.5) * 100, cy + (_mr() - 0.5) * 100, cx, cy);
+    }
+    mCtx.stroke();
   }
+
+  // Dust devil tracks (thin dark curved lines)
+  for (let i = 0; i < 15; i++) {
+    mCtx.strokeStyle = `rgba(40, 18, 8, ${0.06 + _mr() * 0.06})`;
+    mCtx.lineWidth = 0.5 + _mr() * 1.5;
+    mCtx.beginPath();
+    let dx = _mr() * texSize, dy = _mr() * texSize;
+    mCtx.moveTo(dx, dy);
+    for (let s = 0; s < 8; s++) {
+      dx += (_mr() - 0.5) * 80;
+      dy += (_mr() - 0.3) * 60;
+      mCtx.lineTo(dx, dy);
+    }
+    mCtx.stroke();
+  }
+
+  // Fine noise grain overlay
+  const imgData = mCtx.getImageData(0, 0, texSize, texSize);
+  const pixels = imgData.data;
+  for (let i = 0; i < pixels.length; i += 4) {
+    const noise = (_mr() - 0.5) * 12;
+    pixels[i] = Math.max(0, Math.min(255, pixels[i] + noise));
+    pixels[i + 1] = Math.max(0, Math.min(255, pixels[i + 1] + noise * 0.7));
+    pixels[i + 2] = Math.max(0, Math.min(255, pixels[i + 2] + noise * 0.5));
+  }
+  mCtx.putImageData(imgData, 0, 0);
 
   const marsTex = new THREE.CanvasTexture(marsCanvas);
-  marsTex.colorSpace = THREE.SRGBColorSpace;
-  marsTex.anisotropy = 4;
   marsTex.wrapS = THREE.RepeatWrapping;
+  marsTex.wrapT = THREE.RepeatWrapping;
+  marsTex.repeat.set(4, 4); // tile for detail at distance
+  marsTex.colorSpace = THREE.SRGBColorSpace;
+  marsTex.anisotropy = 8;
 
-  const marsMat = new THREE.MeshStandardMaterial({
+  const surfaceMat = new THREE.MeshStandardMaterial({
     map: marsTex,
     roughness: 0.92,
-    metalness: 0.02,
+    metalness: 0.03,
+    side: THREE.DoubleSide,
   });
-  const marsSphere = new THREE.Mesh(marsGeo, marsMat);
-  // Position so the top overlaps slightly ABOVE canyon floor (no gap)
-  marsSphere.position.y = -MARS_RADIUS + 50;
-  group.add(marsSphere);
+
+  // Left surface (extends from canyon left wall to far left)
+  const leftSurf = new THREE.Mesh(
+    new THREE.PlaneGeometry(SURFACE_EXTENT, config.length + SURFACE_EXTENT * 2),
+    surfaceMat,
+  );
+  leftSurf.rotation.x = -Math.PI / 2;
+  leftSurf.position.set(-slotHalfW - SURFACE_EXTENT / 2, surfaceY, 0);
+  group.add(leftSurf);
+
+  // Right surface
+  const rightSurf = new THREE.Mesh(
+    new THREE.PlaneGeometry(SURFACE_EXTENT, config.length + SURFACE_EXTENT * 2),
+    surfaceMat,
+  );
+  rightSurf.rotation.x = -Math.PI / 2;
+  rightSurf.position.set(slotHalfW + SURFACE_EXTENT / 2, surfaceY, 0);
+  group.add(rightSurf);
+
+  // Front cap (closes the gap in front of the canyon, between left and right)
+  const frontSurf = new THREE.Mesh(
+    new THREE.PlaneGeometry(slotHalfW * 2, SURFACE_EXTENT),
+    surfaceMat,
+  );
+  frontSurf.rotation.x = -Math.PI / 2;
+  frontSurf.position.set(0, surfaceY, -slotHalfZ - SURFACE_EXTENT / 2);
+  group.add(frontSurf);
+
+  // Back cap
+  const backSurf = new THREE.Mesh(
+    new THREE.PlaneGeometry(slotHalfW * 2, SURFACE_EXTENT),
+    surfaceMat,
+  );
+  backSurf.rotation.x = -Math.PI / 2;
+  backSurf.position.set(0, surfaceY, slotHalfZ + SURFACE_EXTENT / 2);
+  group.add(backSurf);
+
+  // No background sphere — surface planes + red atmosphere handle the ground.
+  // The sphere was filling the canyon from inside due to its curvature.
 
   // ── End wall — blocks the far end, forces player to climb UP ──
   const endWallGeo = new THREE.PlaneGeometry(config.topWidth * 2.5, config.wallHeight, 30, 20);
