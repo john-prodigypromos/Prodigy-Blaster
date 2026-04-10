@@ -71,9 +71,9 @@ export function createMarsLanding(
     isPlayer: true,
   });
 
-  // Start high above the canyon, offset so player needs to navigate
-  player.position.set(500, MARS_ATMOSPHERE.maxAltitude, -5000);
-  player.velocity.set(0, -12, 0); // initial descent
+  // Start high above the canyon, slight offset so player navigates into it
+  player.position.set(150, MARS_ATMOSPHERE.maxAltitude, -6500);
+  player.velocity.set(0, -15, 0); // initial descent
 
   // Pitch nose slightly down
   const pitchDown = new THREE.Quaternion();
@@ -264,28 +264,33 @@ export function updateMarsLanding(
     state.phase = 'landing';
   }
 
-  // ── Auto-correction toward pad when close ──
-  const padDist = new THREE.Vector2(
-    state.player.position.x - PAD_POSITION.x,
-    state.player.position.z - PAD_POSITION.z
-  ).length();
+  // ── Guided approach toward pad — starts high, strengthens as you descend ──
+  const dx = PAD_POSITION.x - state.player.position.x;
+  const dz = PAD_POSITION.z - state.player.position.z;
+  const padDist = Math.sqrt(dx * dx + dz * dz) || 1;
 
-  if (state.altitude < 500 && padDist < 300) {
-    const correctionStrength = 0.3 * (1 - state.altitude / 500);
-    const dx = PAD_POSITION.x - state.player.position.x;
-    const dz = PAD_POSITION.z - state.player.position.z;
-    const d = Math.sqrt(dx * dx + dz * dz) || 1;
-    state.player.velocity.x += (dx / d) * correctionStrength * dt * 30;
-    state.player.velocity.z += (dz / d) * correctionStrength * dt * 30;
+  // Gentle pull from 3000+ altitude (player can still steer, but drifts toward pad)
+  if (state.altitude < 4000) {
+    const highGuide = 0.15 * Math.max(0, 1 - state.altitude / 4000);
+    state.player.velocity.x += (dx / padDist) * highGuide * dt * 30;
+    state.player.velocity.z += (dz / padDist) * highGuide * dt * 30;
   }
 
-  // ── Auto-flare near ground ──
-  if (state.altitude < 20 && state.player.velocity.y < -5) {
-    state.player.velocity.y *= 0.8;
+  // Stronger correction below 800 altitude and within 600 of pad
+  if (state.altitude < 800 && padDist < 600) {
+    const correctionStrength = 0.6 * (1 - state.altitude / 800);
+    state.player.velocity.x += (dx / padDist) * correctionStrength * dt * 30;
+    state.player.velocity.z += (dz / padDist) * correctionStrength * dt * 30;
   }
 
-  // ── Touchdown ──
-  if (state.player.position.y <= LAND_THRESHOLD && padDist < 80 &&
+  // ── Auto-flare — bleed speed progressively below 100m ──
+  if (state.altitude < 100 && state.player.velocity.y < -3) {
+    const brakeFactor = 0.85 + 0.14 * (state.altitude / 100); // stronger near ground
+    state.player.velocity.y *= brakeFactor;
+  }
+
+  // ── Touchdown — wider landing zone ──
+  if (state.player.position.y <= LAND_THRESHOLD && padDist < 150 &&
       (state.phase === 'landing' || state.phase === 'canyon')) {
     state.player.position.y = LAND_THRESHOLD;
     state.player.velocity.set(0, 0, 0);

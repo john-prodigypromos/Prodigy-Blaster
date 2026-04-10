@@ -54,7 +54,7 @@ function createRockNormalMap(size: number, seed: number): THREE.CanvasTexture {
 // Shared normal map instance (created once)
 let _rockNormalMap: THREE.CanvasTexture | null = null;
 function getRockNormalMap(): THREE.CanvasTexture {
-  if (!_rockNormalMap) _rockNormalMap = createRockNormalMap(512, 77);
+  if (!_rockNormalMap) _rockNormalMap = createRockNormalMap(IS_MOBILE ? 256 : 512, 77);
   return _rockNormalMap;
 }
 
@@ -80,6 +80,16 @@ const DEFAULT_CONFIG: CanyonConfig = {
   topWidth: 300,
   wallHeight: 1500,
 };
+
+/** Detect mobile for performance scaling. */
+const IS_MOBILE = typeof navigator !== 'undefined'
+  && /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+
+/** Gentle S-curve so the canyon doesn't look like a straight rectangle on the planet.
+ *  Both sin terms are zero at z=0, keeping the pad area centred. */
+function canyonMeander(z: number): number {
+  return Math.sin(z * 0.0003) * 80 + Math.sin(z * 0.00068) * 45;
+}
 
 // ── Colour helpers ───────────────────────────────────────
 
@@ -114,8 +124,8 @@ export function createWall(
   cutout?: CavernCutout,
 ): THREE.Mesh {
   const { length, baseWidth, topWidth, wallHeight } = config;
-  const segW = 60; // along length (Z)
-  const segH = 30; // along height (Y)
+  const segW = IS_MOBILE ? 40 : 60; // along length (Z)
+  const segH = IS_MOBILE ? 20 : 30; // along height (Y)
 
   const geo = new THREE.PlaneGeometry(length, wallHeight, segW, segH);
   geo.rotateY(side === -1 ? Math.PI / 2 : -Math.PI / 2); // face inward
@@ -182,7 +192,9 @@ export function createWall(
     }
 
     // Apply displacement along the wall normal (pointing inward)
-    pos.setX(i, wallX + side * (totalDisp + cutoutDisp));
+    // Meander shifts both walls together so the canyon curves naturally
+    const meander = canyonMeander(rawZ);
+    pos.setX(i, wallX + side * (totalDisp + cutoutDisp) + meander);
     pos.setY(i, rawY);
     pos.setZ(i, rawZ);
 
@@ -256,8 +268,8 @@ export function createFloor(
   const floorGroup = new THREE.Group();
 
   const floorWidth = topWidth * 2.2;
-  const segW = 80;
-  const segH = 80;
+  const segW = IS_MOBILE ? 50 : 80;
+  const segH = IS_MOBILE ? 50 : 80;
 
   // ── Main floor plane ──
   const floorGeo = new THREE.PlaneGeometry(floorWidth, length, segW, segH);
@@ -286,6 +298,7 @@ export function createFloor(
       + valueNoise3D(x * ns * 8, z * ns * 8, seed) * 2;
 
     const disp = noiseH * (1 - padFade * padFade);
+    floorPos.setX(i, x + canyonMeander(z));
     floorPos.setY(i, y + disp);
 
     // ── Floor vertex colours — dusty tan sandstone ──
@@ -507,7 +520,8 @@ function createDome(radius: number, px: number, pz: number): THREE.Group {
   const domeGroup = new THREE.Group();
 
   // Solid dome shell — opaque panels between the bars
-  const shellGeo = new THREE.SphereGeometry(radius * 0.995, 64, 32, 0, Math.PI * 2, 0, Math.PI / 2);
+  const shellSegs = IS_MOBILE ? 24 : 64;
+  const shellGeo = new THREE.SphereGeometry(radius * 0.995, shellSegs, shellSegs / 2, 0, Math.PI * 2, 0, Math.PI / 2);
   const shellMat = new THREE.MeshStandardMaterial({
     color: 0xd0d8e0,
     roughness: 0.2,
@@ -515,75 +529,85 @@ function createDome(radius: number, px: number, pz: number): THREE.Group {
   });
   domeGroup.add(new THREE.Mesh(shellGeo, shellMat));
 
-  // Geodesic roof bars — dark metal, clearly raised above the shell
-  const barMat = new THREE.MeshStandardMaterial({
-    color: 0x667788,
-    roughness: 0.6,
-    metalness: 0.4,
-  });
-  const fineStruts = buildGeodesicStruts(radius * 1.04, 2, radius * 0.018, barMat);
-  domeGroup.add(fineStruts);
-
-  // Heavy structural ribs — thick dark beams
-  const ribMat = new THREE.MeshStandardMaterial({
-    color: 0x556677,
-    roughness: 0.5,
-    metalness: 0.5,
-  });
-  const heavyStruts = buildGeodesicStruts(radius * 1.06, 1, radius * 0.035, ribMat);
-  domeGroup.add(heavyStruts);
-
-  // Hub nodes at structural intersections — small spheres where heavy ribs meet
-  const hubGeo = new THREE.SphereGeometry(radius * 0.035, 8, 8);
-  const hubMat = new THREE.MeshStandardMaterial({ color: 0x556677, roughness: 0.5, metalness: 0.5 });
-  const icoRef = new THREE.IcosahedronGeometry(radius * 1.065, 1);
-  const icoPos = icoRef.getAttribute('position');
-  const hubSet = new Set<string>();
-  for (let i = 0; i < icoPos.count; i++) {
-    const y = icoPos.getY(i);
-    if (y < -radius * 0.05) continue;
-    const key = `${icoPos.getX(i).toFixed(1)},${icoPos.getY(i).toFixed(1)},${icoPos.getZ(i).toFixed(1)}`;
-    if (hubSet.has(key)) continue;
-    hubSet.add(key);
-    const hub = new THREE.Mesh(hubGeo, hubMat);
-    hub.position.set(icoPos.getX(i), icoPos.getY(i), icoPos.getZ(i));
-    domeGroup.add(hub);
+  if (!IS_MOBILE) {
+    // Geodesic roof bars — dark metal, clearly raised above the shell
+    const barMat = new THREE.MeshStandardMaterial({
+      color: 0x667788,
+      roughness: 0.6,
+      metalness: 0.4,
+    });
+    const fineStruts = buildGeodesicStruts(radius * 1.04, 2, radius * 0.018, barMat);
+    domeGroup.add(fineStruts);
   }
-  icoRef.dispose();
 
-  // Glowing window band — cyan ring
-  const windowGeo = new THREE.TorusGeometry(radius * 0.85, radius * 0.04, 8, 64);
-  const windowMat = new THREE.MeshBasicMaterial({ color: 0x66ddff, transparent: true, opacity: 0.7 });
-  const windowRing = new THREE.Mesh(windowGeo, windowMat);
-  windowRing.rotation.x = -Math.PI / 2;
-  windowRing.position.y = radius * 0.35;
-  domeGroup.add(windowRing);
+  // Heavy structural ribs — thick dark beams (skip on mobile — not visible from cockpit)
+  if (!IS_MOBILE) {
+    const ribMat = new THREE.MeshStandardMaterial({
+      color: 0x556677,
+      roughness: 0.5,
+      metalness: 0.5,
+    });
+    const heavyStruts = buildGeodesicStruts(radius * 1.06, 1, radius * 0.035, ribMat);
+    domeGroup.add(heavyStruts);
+  }
 
-  // Antenna/spire
-  const spireGeo = new THREE.CylinderGeometry(radius * 0.01, radius * 0.03, radius * 0.3, 8);
-  const spireMat = new THREE.MeshStandardMaterial({ color: 0x999999, roughness: 0.4, metalness: 0.8 });
-  const spire = new THREE.Mesh(spireGeo, spireMat);
-  spire.position.y = radius + radius * 0.15;
-  domeGroup.add(spire);
+  if (!IS_MOBILE) {
+    // Hub nodes at structural intersections — small spheres where heavy ribs meet
+    const hubGeo = new THREE.SphereGeometry(radius * 0.035, 8, 8);
+    const hubMat = new THREE.MeshStandardMaterial({ color: 0x556677, roughness: 0.5, metalness: 0.5 });
+    const icoRef = new THREE.IcosahedronGeometry(radius * 1.065, 1);
+    const icoPos = icoRef.getAttribute('position');
+    const hubSet = new Set<string>();
+    for (let i = 0; i < icoPos.count; i++) {
+      const y = icoPos.getY(i);
+      if (y < -radius * 0.05) continue;
+      const key = `${icoPos.getX(i).toFixed(1)},${icoPos.getY(i).toFixed(1)},${icoPos.getZ(i).toFixed(1)}`;
+      if (hubSet.has(key)) continue;
+      hubSet.add(key);
+      const hub = new THREE.Mesh(hubGeo, hubMat);
+      hub.position.set(icoPos.getX(i), icoPos.getY(i), icoPos.getZ(i));
+      domeGroup.add(hub);
+    }
+    icoRef.dispose();
+  }
 
-  // Blinking light on tip
-  const tipGeo = new THREE.SphereGeometry(radius * 0.025, 8, 8);
-  const tipMat = new THREE.MeshBasicMaterial({ color: 0xff3300 });
-  const tip = new THREE.Mesh(tipGeo, tipMat);
-  tip.position.y = radius + radius * 0.3;
-  domeGroup.add(tip);
+  if (!IS_MOBILE) {
+    // Glowing window band — cyan ring
+    const windowGeo = new THREE.TorusGeometry(radius * 0.85, radius * 0.04, 8, 64);
+    const windowMat = new THREE.MeshBasicMaterial({ color: 0x66ddff, transparent: true, opacity: 0.7 });
+    const windowRing = new THREE.Mesh(windowGeo, windowMat);
+    windowRing.rotation.x = -Math.PI / 2;
+    windowRing.position.y = radius * 0.35;
+    domeGroup.add(windowRing);
+
+    // Antenna/spire
+    const spireGeo = new THREE.CylinderGeometry(radius * 0.01, radius * 0.03, radius * 0.3, 8);
+    const spireMat = new THREE.MeshStandardMaterial({ color: 0x999999, roughness: 0.4, metalness: 0.8 });
+    const spire = new THREE.Mesh(spireGeo, spireMat);
+    spire.position.y = radius + radius * 0.15;
+    domeGroup.add(spire);
+
+    // Blinking light on tip
+    const tipGeo = new THREE.SphereGeometry(radius * 0.025, 8, 8);
+    const tipMat = new THREE.MeshBasicMaterial({ color: 0xff3300 });
+    const tip = new THREE.Mesh(tipGeo, tipMat);
+    tip.position.y = radius + radius * 0.3;
+    domeGroup.add(tip);
+  }
 
   // Base ring — concrete foundation
-  const baseGeo = new THREE.CylinderGeometry(radius * 1.08, radius * 1.14, radius * 0.18, 48);
+  const baseGeo = new THREE.CylinderGeometry(radius * 1.08, radius * 1.14, radius * 0.18, IS_MOBILE ? 16 : 48);
   const baseMat = new THREE.MeshStandardMaterial({ color: 0x555555, roughness: 0.8, metalness: 0.2 });
   const base = new THREE.Mesh(baseGeo, baseMat);
   base.position.y = radius * 0.09;
   domeGroup.add(base);
 
-  // Inner glow
-  const glowLight = new THREE.PointLight(0x66ddff, 0.5, radius * 3);
-  glowLight.position.y = radius * 0.3;
-  domeGroup.add(glowLight);
+  // Inner glow — skip on mobile (7 domes × 1 PointLight = 7 extra lights)
+  if (!IS_MOBILE) {
+    const glowLight = new THREE.PointLight(0x66ddff, 0.5, radius * 3);
+    glowLight.position.y = radius * 0.3;
+    domeGroup.add(glowLight);
+  }
 
   domeGroup.position.set(px, 0, pz);
   return domeGroup;
@@ -697,37 +721,39 @@ export function createBaseColony(): THREE.Group {
 
   // ── Cavern lighting — warm amber glow throughout ──
   // Central overhead
-  const mainLight = new THREE.PointLight(0xffaa44, 3, 600);
+  const mainLight = new THREE.PointLight(0xffaa44, IS_MOBILE ? 4 : 3, 600);
   mainLight.position.set(cx, cavernH * 0.8, cz);
   group.add(mainLight);
 
   // Front fill — illuminates domes facing the canyon opening
-  const frontLight = new THREE.PointLight(0xff9933, 2, 400);
+  const frontLight = new THREE.PointLight(0xff9933, IS_MOBILE ? 3 : 2, 400);
   frontLight.position.set(cx - 100, 60, cz + 100);
   group.add(frontLight);
 
-  // Back fill
-  const backLight = new THREE.PointLight(0xff8822, 1.5, 350);
-  backLight.position.set(cx + 80, 50, cz - 100);
-  group.add(backLight);
+  if (!IS_MOBILE) {
+    // Back fill
+    const backLight = new THREE.PointLight(0xff8822, 1.5, 350);
+    backLight.position.set(cx + 80, 50, cz - 100);
+    group.add(backLight);
 
-  // Cool blue accent lights near the floor — tech/industrial feel
-  const blueLight1 = new THREE.PointLight(0x4488ff, 1, 200);
-  blueLight1.position.set(cx - 60, 5, cz + 60);
-  group.add(blueLight1);
+    // Cool blue accent lights near the floor — tech/industrial feel
+    const blueLight1 = new THREE.PointLight(0x4488ff, 1, 200);
+    blueLight1.position.set(cx - 60, 5, cz + 60);
+    group.add(blueLight1);
 
-  const blueLight2 = new THREE.PointLight(0x4488ff, 1, 200);
-  blueLight2.position.set(cx + 80, 5, cz - 40);
-  group.add(blueLight2);
+    const blueLight2 = new THREE.PointLight(0x4488ff, 1, 200);
+    blueLight2.position.set(cx + 80, 5, cz - 40);
+    group.add(blueLight2);
 
-  // Red warning lights at cavern entrance edges
-  const redLight1 = new THREE.PointLight(0xff2200, 1.5, 150);
-  redLight1.position.set(120, 30, cz - 80);
-  group.add(redLight1);
+    // Red warning lights at cavern entrance edges
+    const redLight1 = new THREE.PointLight(0xff2200, 1.5, 150);
+    redLight1.position.set(120, 30, cz - 80);
+    group.add(redLight1);
 
-  const redLight2 = new THREE.PointLight(0xff2200, 1.5, 150);
-  redLight2.position.set(120, 30, cz + 80);
-  group.add(redLight2);
+    const redLight2 = new THREE.PointLight(0xff2200, 1.5, 150);
+    redLight2.position.set(120, 30, cz + 80);
+    group.add(redLight2);
+  }
 
   return group;
 }
@@ -772,7 +798,7 @@ export function createCanyonTerrain(
   const MARS_RADIUS = 100000;
 
   // ── Procedural Mars surface texture ──
-  const texSize = 2048;
+  const texSize = IS_MOBILE ? 512 : 2048;
   const marsCanvas = document.createElement('canvas');
   marsCanvas.width = texSize; marsCanvas.height = texSize;
   const mCtx = marsCanvas.getContext('2d')!;
@@ -789,7 +815,8 @@ export function createCanyonTerrain(
   mCtx.fillRect(0, 0, texSize, texSize);
 
   // Large dark highland/volcanic regions
-  for (let i = 0; i < 80; i++) {
+  const highlandCount = IS_MOBILE ? 20 : 80;
+  for (let i = 0; i < highlandCount; i++) {
     const cx = _mr() * texSize, cy = _mr() * texSize;
     const cr = 20 + _mr() * 250;
     const g = mCtx.createRadialGradient(cx, cy, cr * 0.05, cx, cy, cr);
@@ -802,7 +829,8 @@ export function createCanyonTerrain(
   }
 
   // Impact craters with rims and shadows
-  for (let i = 0; i < 50; i++) {
+  const craterCount = IS_MOBILE ? 12 : 50;
+  for (let i = 0; i < craterCount; i++) {
     const cx = _mr() * texSize, cy = _mr() * texSize;
     const cr = 3 + _mr() * 60;
     // Shadow inside
@@ -832,16 +860,18 @@ export function createCanyonTerrain(
     }
   }
 
-  // Fine noise grain overlay
-  const imgData = mCtx.getImageData(0, 0, texSize, texSize);
-  const pixels = imgData.data;
-  for (let i = 0; i < pixels.length; i += 4) {
-    const noise = (_mr() - 0.5) * 12;
-    pixels[i] = Math.max(0, Math.min(255, pixels[i] + noise));
-    pixels[i + 1] = Math.max(0, Math.min(255, pixels[i + 1] + noise * 0.7));
-    pixels[i + 2] = Math.max(0, Math.min(255, pixels[i + 2] + noise * 0.5));
+  // Fine noise grain overlay — skip on mobile (expensive per-pixel loop)
+  if (!IS_MOBILE) {
+    const imgData = mCtx.getImageData(0, 0, texSize, texSize);
+    const pixels = imgData.data;
+    for (let i = 0; i < pixels.length; i += 4) {
+      const noise = (_mr() - 0.5) * 12;
+      pixels[i] = Math.max(0, Math.min(255, pixels[i] + noise));
+      pixels[i + 1] = Math.max(0, Math.min(255, pixels[i + 1] + noise * 0.7));
+      pixels[i + 2] = Math.max(0, Math.min(255, pixels[i + 2] + noise * 0.5));
+    }
+    mCtx.putImageData(imgData, 0, 0);
   }
-  mCtx.putImageData(imgData, 0, 0);
 
   const marsTex = new THREE.CanvasTexture(marsCanvas);
   marsTex.colorSpace = THREE.SRGBColorSpace;
@@ -852,7 +882,7 @@ export function createCanyonTerrain(
     roughness: 0.92,
     metalness: 0.02,
   });
-  const marsGeo = new THREE.SphereGeometry(MARS_RADIUS, 128, 96);
+  const marsGeo = new THREE.SphereGeometry(MARS_RADIUS, IS_MOBILE ? 48 : 128, IS_MOBILE ? 32 : 96);
   const marsSphere = new THREE.Mesh(marsGeo, marsMat);
   marsSphere.position.y = -MARS_RADIUS + config.wallHeight;
   group.add(marsSphere);
@@ -883,7 +913,7 @@ export function createCanyonTerrain(
     normalMap: getRockNormalMap(), normalScale: new THREE.Vector2(0.8, 0.8),
   });
   const endWall = new THREE.Mesh(endWallGeo, endWallMat);
-  endWall.position.set(0, config.wallHeight / 2, config.length / 2); // at the far end
+  endWall.position.set(canyonMeander(config.length / 2), config.wallHeight / 2, config.length / 2); // at the far end, shifted to match meandering walls
   group.add(endWall);
 
   // ── Lighting ──
