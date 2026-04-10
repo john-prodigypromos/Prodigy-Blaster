@@ -112,6 +112,7 @@ function handleSceneEnter(state: SceneState, _prev: SceneState | null): void {
       showCharSelectOverlay();
       break;
     case 'levelIntro':
+      crosshairEl.style.display = 'none';
       showLevelIntroOverlay();
       break;
     case 'cinematic':
