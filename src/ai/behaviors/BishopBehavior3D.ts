@@ -204,16 +204,8 @@ export class BishopBehavior3D implements AIBehavior3D {
       }
     }
 
-    // ── Snap impulse on phase transitions ──
-    if (this._snapImpulse !== 0) {
-      yaw += this._snapImpulse;
-      this._snapImpulse = 0;
-    }
-
-    // ── Jink overlay — escalating with desperation ──
-    const jink = jinkOverlay(this.timer, this.seed, jinkIntensity);
-    yaw = Math.max(-1, Math.min(1, yaw + jink.yaw));
-    pitch = Math.max(-1, Math.min(1, pitch + jink.pitch));
+    yaw = Math.max(-1, Math.min(1, yaw));
+    pitch = Math.max(-1, Math.min(1, pitch));
 
     return { yaw, pitch, roll: 0, thrust, fire };
   }
