@@ -350,20 +350,17 @@ export function updateArena(
     // Apply physics so enemies fly with real velocity, drag, and momentum
     applyShipPhysics(enemy, aiInput, effectiveDt, now);
 
-    // ── Hard physics leash — directly yank enemies back if too far ──
-    // This overrides ALL behavior steering. No enemy can escape.
+    // ── Hard physics leash — full velocity override when too far ──
+    // Wipe ALL velocity and set it straight toward the player.
+    // No jink, no chaos, no sideways drift can fight this.
     _projTmp.subVectors(player.position, enemy.position);
     const dist = _projTmp.length();
     if (dist > LEASH_DIST) {
       _projTmp.divideScalar(dist); // normalize toward player
-      const overshoot = dist - LEASH_DIST;
-      // Kill outward velocity component
-      const outwardSpeed = -enemy.velocity.dot(_projTmp); // positive = moving away
-      if (outwardSpeed > 0) {
-        enemy.velocity.addScaledVector(_projTmp, outwardSpeed); // zero out the away component
-      }
-      // Pull toward player — stronger the further out
-      enemy.velocity.addScaledVector(_projTmp, Math.min(overshoot, 200) * LEASH_FORCE / 200 * effectiveDt);
+      const returnSpeed = Math.min(dist * 0.5, PHYSICS.MAX_VELOCITY * enemy.speedMult);
+      enemy.velocity.copy(_projTmp).multiplyScalar(returnSpeed);
+      // Also point the ship toward the player so steering doesn't fight
+      enemy.group.lookAt(player.position);
     }
   }
 
