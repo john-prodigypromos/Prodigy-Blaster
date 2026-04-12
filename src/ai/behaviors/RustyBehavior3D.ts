@@ -148,7 +148,8 @@ export class RustyBehavior3D implements AIBehavior3D {
         const steer = steerToward(self, this._interceptPt, 4.0, 0.7);
         yaw = steer.yaw;
         pitch = steer.pitch;
-        thrust = 0.95; // hard closing speed
+        // Coast while turning back, full thrust only when facing player
+        thrust = facingAlignment > 0 ? 0.9 : 0.2;
 
         if (distToPlayer < 120 && facingAlignment > 0.3) {
           if (now - self.lastFireTime >= this.fireRate) fire = true;

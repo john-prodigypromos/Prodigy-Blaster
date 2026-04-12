@@ -128,7 +128,8 @@ export class BoloTieBehavior3D implements AIBehavior3D {
         const steer = steerToward(self, this._interceptPt, 4.5, 0.7);
         yaw = steer.yaw;
         pitch = steer.pitch;
-        thrust = 0.95;
+        // Coast while turning back, full thrust only when facing player
+        thrust = facingAlignment > 0 ? 0.95 : 0.2;
 
         if (distToPlayer < 140 && facingAlignment > 0.25) {
           if (now - self.lastFireTime >= this.fireRate * 0.8) fire = true;
