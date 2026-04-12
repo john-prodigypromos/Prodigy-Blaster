@@ -132,8 +132,8 @@ export class BishopBehavior3D implements AIBehavior3D {
         this._interceptPt.addScaledVector(this._right, orbitOffset);
         this._interceptPt.y += chaos(this.timer, this.seed * 1.5) * 20 + 15;
 
-        const sensitivity = this.bossPhase === 'phase1' ? 2.5 : 3.0;
-        const steer = steerToward(self, this._interceptPt, sensitivity, 0.5);
+        const sensitivity = this.bossPhase === 'phase1' ? 3.5 : 4.5;
+        const steer = steerToward(self, this._interceptPt, sensitivity, 0.7);
         yaw = steer.yaw;
         pitch = steer.pitch;
         thrust = steer.thrust;
@@ -151,7 +151,7 @@ export class BishopBehavior3D implements AIBehavior3D {
 
       case 'breakaway': {
         // Short hard break turn away from player
-        const steer = steerAway(self, target.position, 2.5, 0.6, this.breakDir * 0.6);
+        const steer = steerAway(self, target.position, 4.5, 0.75, this.breakDir * 0.8);
         yaw = steer.yaw;
         pitch = steer.pitch;
         thrust = steer.thrust;
@@ -223,14 +223,14 @@ export class BishopBehavior3D implements AIBehavior3D {
     switch (subPhase) {
       case 'dogfight':
         this.phaseDuration = this.bossPhase === 'phase1'
-          ? 7 + (chaos(this.timer, this.seed) + 1) * 2   // 7-11s
-          : 3 + (chaos(this.timer, this.seed) + 1) * 1;   // 3-5s
+          ? 3 + (chaos(this.timer, this.seed) + 1) * 1.5  // 3-6s
+          : 1.5 + (chaos(this.timer, this.seed) + 1) * 1; // 1.5-3.5s
         break;
       case 'breakaway':
-        this.phaseDuration = 1.0 + (chaos(this.timer, this.seed) + 1) * 0.4; // 1.0-1.8s
+        this.phaseDuration = 0.5 + (chaos(this.timer, this.seed) + 1) * 0.3; // 0.5-1.1s
         break;
       case 'evasive':
-        this.phaseDuration = 4 + (chaos(this.timer, this.seed) + 1) * 1.5; // 4-7s
+        this.phaseDuration = 2 + (chaos(this.timer, this.seed) + 1) * 1.0; // 2-4s
         break;
       default:
         this.phaseDuration = 3;

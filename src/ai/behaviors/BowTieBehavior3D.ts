@@ -119,9 +119,9 @@ export class BowTieBehavior3D implements AIBehavior3D {
 
       case 'approach': {
         // Dive toward player at high speed — aggressive intercept
-        leadIntercept(self.position, target.position, target.velocity, 110, this._interceptPt);
+        leadIntercept(self.position, target.position, target.velocity, 130, this._interceptPt);
         this._interceptPt.y += 16;
-        const steer = steerToward(self, this._interceptPt, 3.0, 0.7);
+        const steer = steerToward(self, this._interceptPt, 4.5, 0.8);
         yaw = steer.yaw;
         pitch = steer.pitch;
         thrust = 1.0;
@@ -182,9 +182,9 @@ export class BowTieBehavior3D implements AIBehavior3D {
     this._snapImpulse = 0.4 * this.breakDir;
 
     switch (phase) {
-      case 'hidden': this.phaseDuration = 2.0 + (chaos(this.timer, this.seed) + 1) * 1.0; break; // 2-4s
-      case 'attack': this.phaseDuration = 1.8 + (chaos(this.timer, this.seed) + 1) * 0.7; break; // 1.8-3.2s
-      default:       this.phaseDuration = 3; break;
+      case 'hidden': this.phaseDuration = 1.0 + (chaos(this.timer, this.seed) + 1) * 0.7; break; // 1.0-2.4s
+      case 'attack': this.phaseDuration = 1.0 + (chaos(this.timer, this.seed) + 1) * 0.5; break; // 1.0-2.0s
+      default:       this.phaseDuration = 2; break;
     }
   }
 }

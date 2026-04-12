@@ -347,13 +347,13 @@ export class HUD3D {
       const enemy = enemies[i];
       if (!enemy.alive) continue;
 
-      // Project enemy position to screen (offset well above ship)
+      // Project enemy position to screen, then offset upward in screen space
+      // so the label stays a consistent pixel distance above the ship at any range
       const labelPos = enemy.position.clone();
-      labelPos.y += 38; // above the ship — close enough to associate, clear enough to read
       const pos = labelPos.project(camera);
 
       const sx = (pos.x * 0.5 + 0.5) * w;
-      const sy = (-pos.y * 0.5 + 0.5) * h;
+      const sy = (-pos.y * 0.5 + 0.5) * h - 70; // 70px above projected ship center
       const behind = pos.z > 1;
 
       const onScreen = !behind && sx > 30 && sx < w - 30 && sy > 30 && sy < h - 30;

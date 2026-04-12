@@ -107,11 +107,11 @@ export class BoloTieBehavior3D implements AIBehavior3D {
           target.position.z + Math.sin(orbitAngle) * orbitRadius,
         );
 
-        const steer = steerToward(self, this._prowlPt, 2.5, 0.55);
+        const steer = steerToward(self, this._prowlPt, 4.0, 0.7);
         yaw = steer.yaw;
         pitch = steer.pitch;
-        // Predatory lunges — speed bursts every ~0.8s
-        thrust = this.phaseTimer % 0.8 < 0.3 ? 0.9 : 0.7;
+        // Predatory lunges — speed bursts every ~0.6s
+        thrust = this.phaseTimer % 0.6 < 0.25 ? 1.0 : 0.8;
 
         if (distToPlayer < 120 && facingAlignment > 0.3) {
           if (now - self.lastFireTime >= this.fireRate) fire = true;
@@ -125,10 +125,10 @@ export class BoloTieBehavior3D implements AIBehavior3D {
         this._interceptPt.addScaledVector(this._right, chaos(this.timer, this.seed) * 30 * this.breakDir);
         this._interceptPt.y += 14;
 
-        const steer = steerToward(self, this._interceptPt, 3.5, 0.6);
+        const steer = steerToward(self, this._interceptPt, 4.5, 0.7);
         yaw = steer.yaw;
         pitch = steer.pitch;
-        thrust = 0.85;
+        thrust = 0.95;
 
         if (distToPlayer < 140 && facingAlignment > 0.25) {
           if (now - self.lastFireTime >= this.fireRate * 0.8) fire = true;
@@ -153,10 +153,10 @@ export class BoloTieBehavior3D implements AIBehavior3D {
       }
 
       case 'recovery': {
-        const steer = steerAway(self, target.position, 3.5, 0.6, this.breakDir * 0.7);
+        const steer = steerAway(self, target.position, 5.0, 0.75, this.breakDir * 0.9);
         yaw = steer.yaw;
         pitch = steer.pitch;
-        thrust = Math.max(0.6, steer.thrust);
+        thrust = Math.max(0.8, steer.thrust);
         pitch += this.breakDir * 0.3;
         pitch = Math.max(-1, Math.min(1, pitch));
 
@@ -188,10 +188,10 @@ export class BoloTieBehavior3D implements AIBehavior3D {
     this._snapImpulse = 0.4 * this.breakDir;
 
     switch (phase) {
-      case 'prowl':    this.phaseDuration = 1.2 + (chaos(this.timer, this.seed) + 1) * 0.65; break; // 1.2-2.5s
-      case 'charging': this.phaseDuration = 1.5 + (chaos(this.timer, this.seed) + 1) * 0.5; break;  // 1.5-2.5s
-      case 'recovery': this.phaseDuration = 0.4 + (chaos(this.timer, this.seed) + 1) * 0.2; break;  // 0.4-0.8s
-      default:         this.phaseDuration = 3; break;
+      case 'prowl':    this.phaseDuration = 0.6 + (chaos(this.timer, this.seed) + 1) * 0.5; break; // 0.6-1.6s
+      case 'charging': this.phaseDuration = 1.0 + (chaos(this.timer, this.seed) + 1) * 0.5; break;  // 1.0-2.0s
+      case 'recovery': this.phaseDuration = 0.3 + (chaos(this.timer, this.seed) + 1) * 0.15; break; // 0.3-0.6s
+      default:         this.phaseDuration = 2; break;
     }
   }
 }
