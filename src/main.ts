@@ -123,7 +123,8 @@ function handleSceneEnter(state: SceneState, _prev: SceneState | null): void {
       startMarsLaunch();
       break;
     case 'marsLanding':
-      startMarsLanding();
+      // Mars landing removed — skip to high score
+      sceneManager.transition('highScore');
       break;
     case 'arena':
       startArena();
@@ -156,7 +157,6 @@ function handleSceneExit(state: SceneState, _next: SceneState): void {
     marsLaunch = null;
   }
   if (state === 'marsLanding' && marsLanding) {
-    cleanupMarsLanding(marsLanding, bundle.scene);
     marsLanding = null;
   }
 }
@@ -723,7 +723,7 @@ function animate() {
       if (hasNext) {
         sceneManager.transition('levelIntro');
       } else {
-        sceneManager.transition('marsLanding');
+        sceneManager.transition('highScore');
       }
     } else if (arena.gameOver && now - arena.gameOverTime > TRANSITION_DELAY) {
       sceneManager.transition('gameOver');
@@ -737,11 +737,6 @@ function animate() {
     updateMarsLaunch(marsLaunch, keys, dt, now, bundle.scene);
     if (marsLaunch.orbitReached && now - marsLaunch.orbitTimer > 2000) {
       sceneManager.transition('levelIntro');
-    }
-  } else if (sceneManager.current === 'marsLanding' && marsLanding) {
-    updateMarsLanding(marsLanding, keys, dt, now, bundle.scene);
-    if (isMarsLandingComplete(marsLanding)) {
-      sceneManager.transition('highScore');
     }
   } else if (sceneManager.current === 'title') {
     // Slowly rotate camera for cinematic idle

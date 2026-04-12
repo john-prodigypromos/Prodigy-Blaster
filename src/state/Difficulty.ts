@@ -21,9 +21,9 @@ export const DIFFICULTY: Record<DifficultyLevel, DifficultyConfig> = {
     playerShield: 120,
     enemyHull: 350,
     enemyShield: 0,
-    enemySpeedMult: 0.6,
-    enemyRotationMult: 0.6,
-    enemyFireRate: 500,
+    enemySpeedMult: 0.8,
+    enemyRotationMult: 0.8,
+    enemyFireRate: 400,
     enemyChaseRange: 500,
   },
   intermediate: {
