@@ -245,44 +245,47 @@ export function updateMarsLaunch(
   // ── Physics ──
   applyShipPhysics(player, input, dt, now, atmosMods);
 
-  // ── Floor/surface collision — hitting Mars at speed = death ──
+  // ── Floor/surface collision — bounce, don't kill ──
   if (player.position.y < 0) {
     const impactSpeed = Math.abs(player.velocity.y);
     player.position.y = 0;
-    player.velocity.y = 0;
-    if (impactSpeed > 40) {
-      player.applyDamage(9999, now);
-      cockpitCam.shake(5.0);
-      sound.explosion();
+    player.velocity.y = Math.abs(player.velocity.y) * 0.3; // bounce up
+    if (impactSpeed > 20) {
+      player.applyDamage(Math.min(15, Math.round(impactSpeed * 0.3)), now);
+      cockpitCam.shake(Math.min(3.0, impactSpeed * 0.05));
     }
   }
 
-  // ── Canyon wall collision — high speed = death ──
+  // ── Canyon wall collision — bounce off, don't kill ──
   const wallHalfWidth = 35 + state.altitude * 0.1;
   if (player.position.x < -wallHalfWidth) {
     const wallSpeed = Math.abs(player.velocity.x);
     player.position.x = -wallHalfWidth;
-    if (player.velocity.x < 0) player.velocity.x = Math.abs(player.velocity.x) * 0.5;
-    if (wallSpeed > 40) {
-      player.applyDamage(9999, now);
-      cockpitCam.shake(5.0);
-      sound.explosion();
-    } else {
-      player.applyDamage(2, now);
-      cockpitCam.shake(0.8);
+    player.velocity.x = Math.abs(player.velocity.x) * 0.4; // bounce inward
+    if (wallSpeed > 10) {
+      player.applyDamage(Math.min(10, Math.round(wallSpeed * 0.2)), now);
+      cockpitCam.shake(Math.min(2.0, wallSpeed * 0.03));
     }
   } else if (player.position.x > wallHalfWidth) {
     const wallSpeed = Math.abs(player.velocity.x);
     player.position.x = wallHalfWidth;
-    if (player.velocity.x > 0) player.velocity.x = -Math.abs(player.velocity.x) * 0.5;
-    if (wallSpeed > 40) {
-      player.applyDamage(9999, now);
-      cockpitCam.shake(5.0);
-      sound.explosion();
-    } else {
-      player.applyDamage(2, now);
-      cockpitCam.shake(0.8);
+    player.velocity.x = -Math.abs(player.velocity.x) * 0.4; // bounce inward
+    if (wallSpeed > 10) {
+      player.applyDamage(Math.min(10, Math.round(wallSpeed * 0.2)), now);
+      cockpitCam.shake(Math.min(2.0, wallSpeed * 0.03));
     }
+  }
+
+  // ── Death recovery — respawn on pad if somehow killed ──
+  if (!player.alive) {
+    player.hull = Math.round(player.maxHull * 0.5);
+    player.shield = player.maxShield;
+    player.alive = true;
+    player.velocity.set(0, 0, 0);
+    player.position.set(0, 15, -8000);
+    state.phase = 'grounded';
+    state.altitude = 15;
+    cockpitCam.shake(1.0);
   }
 
   // ── Sky color from atmosphere visuals ──
