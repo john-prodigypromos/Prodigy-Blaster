@@ -69,7 +69,7 @@ export function createMarsLaunch(
     group: playerGeo,
     maxHull: diff.playerHull,
     maxShield: diff.playerShield,
-    speedMult: 100.0,  // rocket launch — 100x thrust
+    speedMult: 80.0,  // rocket launch thrust (reduced from 100)
     rotationMult: 1.0,
     isPlayer: true,
   });
