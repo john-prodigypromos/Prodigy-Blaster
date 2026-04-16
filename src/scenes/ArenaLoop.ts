@@ -289,8 +289,8 @@ export function updateArena(
   const keyYaw = (keys['ArrowRight'] ? 1 : 0) + (keys['ArrowLeft'] ? -1 : 0);
 
   // Pitch: Up = nose UP, Down = nose DOWN. Always.
-  // Positive pitch input = positive rotation around local X = nose UP.
-  const keyPitch = (keys['ArrowUp'] ? 1 : 0) + (keys['ArrowDown'] ? -1 : 0);
+  // Three.js: NEGATIVE rotation around local X = nose UP (right-hand rule).
+  const keyPitch = (keys['ArrowUp'] ? -1 : 0) + (keys['ArrowDown'] ? 1 : 0);
 
   // Thrust: E=forward, D=reverse on desktop, touch buttons on mobile
   const keyThrust = (keys['KeyE'] ? 1 : 0) + (keys['KeyD'] ? -1 : 0);
@@ -298,7 +298,7 @@ export function updateArena(
 
   const input: ShipInput = {
     yaw: Math.max(-1, Math.min(1, keyYaw + touch.yaw + mouse.yaw)),
-    pitch: Math.max(-1, Math.min(1, keyPitch + touch.pitch + mouse.verticalMove)),
+    pitch: Math.max(-1, Math.min(1, keyPitch + touch.pitch - mouse.verticalMove)),
     roll: 0,
     thrust: combinedThrust,
   };

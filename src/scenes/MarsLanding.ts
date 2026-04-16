@@ -258,12 +258,12 @@ export function updateMarsLanding(
   const mouse = state.mouseControls.getInput();
 
   const keyYaw = (keys['ArrowRight'] ? 1 : 0) + (keys['ArrowLeft'] ? -1 : 0);
-  const keyPitch = (keys['ArrowUp'] ? 1 : 0) + (keys['ArrowDown'] ? -1 : 0);
+  const keyPitch = (keys['ArrowUp'] ? -1 : 0) + (keys['ArrowDown'] ? 1 : 0);
   const keyThrust = (keys['KeyE'] ? 1 : 0) + (keys['KeyD'] ? -1 : 0);
 
   const input: ShipInput = {
     yaw:    Math.max(-1, Math.min(1, keyYaw + touch.yaw + mouse.yaw)),
-    pitch:  Math.max(-1, Math.min(1, keyPitch + touch.pitch + mouse.verticalMove)),
+    pitch:  Math.max(-1, Math.min(1, keyPitch + touch.pitch - mouse.verticalMove)),
     roll:   0,
     thrust: Math.max(-1, Math.min(1, keyThrust + touch.thrust)),
   };
