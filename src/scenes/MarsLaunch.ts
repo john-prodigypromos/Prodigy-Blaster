@@ -155,7 +155,7 @@ export function createMarsLaunch(
   promptEl.appendChild(bannerSubtitle);
   const bannerSub = document.createElement('div');
   bannerSub.textContent = 'HOLD THRUST TO LAUNCH';
-  bannerSub.style.cssText = 'font-size:clamp(14px,2.5vw,20px);letter-spacing:4px;opacity:0.7;text-shadow:0 0 12px rgba(0,255,255,0.4);';
+  bannerSub.style.cssText = 'font-size:clamp(14px,2.5vw,20px);letter-spacing:4px;background:rgba(0,40,80,0.85);color:#ffffff;padding:8px 20px;border-radius:6px;display:inline-block;text-shadow:none;';
   promptEl.appendChild(bannerSub);
 
   // Inject keyframes if not already present
