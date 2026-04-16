@@ -32,8 +32,14 @@ export class CockpitCamera {
     this._worldOffset.applyQuaternion(player.quaternion);
     this._worldPos.copy(player.position).add(this._worldOffset);
 
-    // Tight follow — near-instant position tracking
-    this.camera.position.lerp(this._worldPos, Math.min(1, dt * 30));
+    // Snap camera when ship is nearly stationary (prevents lazy-eye drift on pad)
+    // Smooth lerp only when actually flying
+    const speed = player.velocity.length();
+    if (speed < 5) {
+      this.camera.position.copy(this._worldPos);
+    } else {
+      this.camera.position.lerp(this._worldPos, Math.min(1, dt * 30));
+    }
 
     // Look target — slightly ahead of ship
     const forward = player.getForward();
