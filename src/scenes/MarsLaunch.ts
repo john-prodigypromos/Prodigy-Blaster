@@ -40,6 +40,7 @@ export interface MarsLaunchState {
   dustParticles: THREE.Points;
   altitude: number;
   phase: 'grounded' | 'climbing' | 'orbit';
+  climbTimer: number;
   orbitReached: boolean;
   orbitTimer: number;
   crashed: boolean;
@@ -62,8 +63,7 @@ export function createMarsLaunch(
   const playerGeo = createPlayerShipGeometry();
   applyMaterials(playerGeo, createPlayerMaterials(charColor));
   playerGeo.position.set(0, 15, -8000); // on the pad, deep inside the canyon
-  playerGeo.rotation.x = -Math.PI / 2; // nose pointing straight UP for launch
-  playerGeo.visible = false;
+  playerGeo.visible = false; // cockpit view — ship hidden
   scene.add(playerGeo);
 
   const player = new Ship3D({
@@ -193,6 +193,7 @@ export function createMarsLaunch(
     dustParticles,
     altitude: 0,
     phase: 'grounded',
+    climbTimer: 0,
     orbitReached: false,
     orbitTimer: 0,
     crashed: false,
@@ -266,6 +267,22 @@ export function updateMarsLaunch(
 
   // ── Physics (only when climbing/flying) ──
   applyShipPhysics(player, input, dt, now, atmosMods);
+
+  // ── Auto-pitch upward during first 3 seconds of climb ──
+  // Ship starts facing forward along canyon; we smoothly rotate it
+  // to point upward so thrust carries the player into the sky.
+  state.climbTimer += dt;
+  if (state.climbTimer < 3.0) {
+    const upQuat = new THREE.Quaternion().setFromAxisAngle(
+      new THREE.Vector3(1, 0, 0), -Math.PI / 2, // nose up
+    );
+    const t = Math.min(1, state.climbTimer / 2.5); // ease over 2.5s
+    player.group.quaternion.slerp(upQuat, t * 0.05); // gentle per-frame blend
+    player.group.quaternion.normalize();
+    // Also push velocity upward to match the rotation
+    const fwd = player.getForward();
+    player.velocity.copy(fwd).multiplyScalar(player.velocity.length());
+  }
 
   // ── Hard floor — absolutely cannot go below surface ──
   if (player.position.y < 0) {
