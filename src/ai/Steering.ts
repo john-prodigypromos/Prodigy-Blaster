@@ -60,9 +60,9 @@ export function steerToward(
   const targetElev = Math.asin(clamp(_toTarget.y));
   const fwdElev = Math.asin(clamp(forward.y));
   const pitchAngle = targetElev - fwdElev;
-  // Physics: positive pitch = nose DOWN.  If target is ABOVE (pitchAngle > 0)
-  // we need nose UP = negative pitch.
-  const pitch = clamp(-pitchAngle * sensitivity);
+  // Physics: positive pitch = nose UP.  If target is ABOVE (pitchAngle > 0)
+  // we need positive pitch.
+  const pitch = clamp(pitchAngle * sensitivity);
 
   // ── Thrust: full when aligned, reduced when turning hard ──
   const alignment = Math.max(0, forward.dot(_toTarget));

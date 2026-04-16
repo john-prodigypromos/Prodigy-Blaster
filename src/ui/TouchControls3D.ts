@@ -199,7 +199,7 @@ export class TouchControls3D {
 
     return {
       yaw: Math.abs(this.joystickDelta.x) > 0.15 ? this.joystickDelta.x : 0,
-      pitch: Math.abs(this.joystickDelta.y) > 0.15 ? this.joystickDelta.y : 0,
+      pitch: Math.abs(this.joystickDelta.y) > 0.15 ? -this.joystickDelta.y : 0,
       thrust: (this.thrustPressed ? 1 : 0) + (this.reversePressed ? -1 : 0),
       fire: this.firePressed,
     };
