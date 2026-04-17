@@ -14,7 +14,7 @@ export const ARENA = {
 export const PHYSICS = {
   FIXED_TIMESTEP: 1000 / 60,
   THRUST: 80,  // gentle forward drift — enemies can keep up
-  ROTATION_SPEED: Math.PI * 1.2,  // fast turning for aggressive dogfighting
+  ROTATION_SPEED: Math.PI * 0.9,  // balanced — fast enough for enemies, not too twitchy for player
   DRAG_HALF_LIFE: 1.5,
   MAX_VELOCITY: 100,  // slow enough that enemies stay in view
   WALL_BOUNCE_FACTOR: 0.6,
