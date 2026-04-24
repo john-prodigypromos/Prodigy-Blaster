@@ -59,10 +59,10 @@ export class HUD3D {
   private missionPhase: 'launch' | 'combat' | 'landing' | null = null;
   // Pre-allocated to avoid per-frame Vector3 garbage in the project calls
   private _projTmp = new THREE.Vector3();
-  // Artificial horizon
-  private horizonContainer: HTMLDivElement = null!;
-  private horizonLine: HTMLDivElement = null!;
-  private horizonLabel: HTMLDivElement = null!;
+  // Pitch ladder HUD
+  private ladderContainer: HTMLDivElement = null!;
+  private ladderInner: HTMLDivElement = null!;
+  private invertedLabel: HTMLDivElement = null!;
   private _euler = new THREE.Euler();
 
   constructor() {
@@ -203,40 +203,60 @@ export class HUD3D {
       @keyframes lockSpin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
       @keyframes lockPulse { 0%,100%{opacity:0.6} 50%{opacity:1} }
 
-      /* ── Artificial horizon ── */
-      .horizon-container {
-        position:fixed;bottom:26vh;left:50%;transform:translateX(-50%);
-        width:120px;height:120px;
+      /* ── Pitch ladder HUD ── */
+      .ladder-container {
+        position:fixed;top:50%;left:50%;
+        transform:translate(-50%,-50%);
+        width:360px;height:280px;
         pointer-events:none;z-index:22;
-        overflow:hidden;border-radius:50%;
-        border:1px solid rgba(60,120,200,0.2);
-        background:rgba(0,0,0,0.15);
+        overflow:hidden;
       }
-      .horizon-line {
+      .ladder-inner {
         position:absolute;left:50%;top:50%;
-        width:100%;height:0;
+        width:100%;
         transform-origin:center center;
-        border-top:2px solid rgba(0,200,255,0.5);
       }
-      .horizon-line::before {
-        content:'';position:absolute;
-        left:calc(50% - 4px);top:-5px;
-        width:8px;height:8px;
-        border:2px solid rgba(0,200,255,0.5);border-radius:50%;
-        background:transparent;
+      .ladder-rung {
+        position:absolute;left:50%;transform:translateX(-50%);
+        display:flex;align-items:center;justify-content:center;gap:0;
       }
-      .horizon-line::after {
-        content:'';position:absolute;
-        left:0;right:0;bottom:0;
-        height:60px;
-        background:linear-gradient(to bottom, rgba(100,60,0,0.15), rgba(100,60,0,0.25));
-        pointer-events:none;
+      .ladder-rung .rung-line {
+        height:0;border-top:1px solid rgba(0,220,255,0.35);
       }
-      .horizon-label {
-        position:absolute;bottom:4px;left:50%;transform:translateX(-50%);
-        font-size:9px;font-weight:700;letter-spacing:2px;
+      .ladder-rung .rung-line.solid { width:60px; }
+      .ladder-rung .rung-line.dashed { width:60px;border-top-style:dashed;border-top-color:rgba(0,220,255,0.25); }
+      .ladder-rung .rung-gap { width:80px; }
+      .ladder-rung .rung-label {
+        position:absolute;
+        font-size:10px;font-weight:600;letter-spacing:1px;
+        color:rgba(0,220,255,0.4);font-family:var(--font-display);
+      }
+      .ladder-rung .rung-label.left { right:calc(50% + 72px); }
+      .ladder-rung .rung-label.right { left:calc(50% + 72px); }
+      .ladder-rung-zero .rung-line { border-top-width:2px;border-top-color:rgba(0,220,255,0.5); }
+      .ladder-rung-zero .rung-label { color:rgba(0,220,255,0.55); }
+      /* Fixed center wings marker */
+      .ladder-wings {
+        position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
+        pointer-events:none;z-index:23;
+        width:44px;height:2px;
+        display:flex;align-items:center;gap:0;
+      }
+      .ladder-wings::before, .ladder-wings::after {
+        content:'';display:block;width:16px;height:2px;
+        background:rgba(0,220,255,0.7);
+      }
+      .ladder-wings .wing-dot {
+        width:6px;height:6px;border-radius:50%;flex-shrink:0;
+        border:1.5px solid rgba(0,220,255,0.7);background:transparent;
+        margin:0 1px;
+      }
+      .inverted-label {
+        position:fixed;top:calc(50% + 160px);left:50%;transform:translateX(-50%);
+        font-size:12px;font-weight:700;letter-spacing:3px;
         color:rgba(255,100,50,0.9);font-family:var(--font-display);
-        text-shadow:0 0 6px rgba(255,80,30,0.5);
+        text-shadow:0 0 8px rgba(255,80,30,0.6);
+        pointer-events:none;z-index:23;
         opacity:0;transition:opacity 0.3s ease;
       }
 
@@ -353,17 +373,61 @@ export class HUD3D {
       this.container.appendChild(controls);
     }
 
-    // ── Artificial horizon — roll/pitch indicator ──
-    this.horizonContainer = document.createElement('div');
-    this.horizonContainer.className = 'horizon-container';
-    this.horizonLine = document.createElement('div');
-    this.horizonLine.className = 'horizon-line';
-    this.horizonContainer.appendChild(this.horizonLine);
-    this.horizonLabel = document.createElement('div');
-    this.horizonLabel.className = 'horizon-label';
-    this.horizonLabel.textContent = 'INVERTED';
-    this.horizonContainer.appendChild(this.horizonLabel);
-    this.container.appendChild(this.horizonContainer);
+    // ── Pitch ladder HUD — fighter jet style ──
+    this.ladderContainer = document.createElement('div');
+    this.ladderContainer.className = 'ladder-container';
+    this.ladderInner = document.createElement('div');
+    this.ladderInner.className = 'ladder-inner';
+
+    // Build rungs: -40, -30, -20, -10, 0, 10, 20, 30, 40 degrees
+    const rungs = [-40, -30, -20, -10, 0, 10, 20, 30, 40];
+    const pxPerDeg = 3.2; // pixels per degree of pitch
+    for (const deg of rungs) {
+      const rung = document.createElement('div');
+      rung.className = `ladder-rung${deg === 0 ? ' ladder-rung-zero' : ''}`;
+      rung.style.top = `${-deg * pxPerDeg}px`;
+
+      const lineClass = deg >= 0 ? 'solid' : 'dashed';
+      const lineL = document.createElement('div');
+      lineL.className = `rung-line ${lineClass}`;
+      const gap = document.createElement('div');
+      gap.className = 'rung-gap';
+      const lineR = document.createElement('div');
+      lineR.className = `rung-line ${lineClass}`;
+      rung.appendChild(lineL);
+      rung.appendChild(gap);
+      rung.appendChild(lineR);
+
+      if (deg !== 0) {
+        const labelL = document.createElement('div');
+        labelL.className = 'rung-label left';
+        labelL.textContent = String(Math.abs(deg));
+        const labelR = document.createElement('div');
+        labelR.className = 'rung-label right';
+        labelR.textContent = String(Math.abs(deg));
+        rung.appendChild(labelL);
+        rung.appendChild(labelR);
+      }
+
+      this.ladderInner.appendChild(rung);
+    }
+
+    this.ladderContainer.appendChild(this.ladderInner);
+    this.container.appendChild(this.ladderContainer);
+
+    // Fixed center wings marker — does not rotate
+    const wings = document.createElement('div');
+    wings.className = 'ladder-wings';
+    const wingDot = document.createElement('div');
+    wingDot.className = 'wing-dot';
+    wings.appendChild(wingDot);
+    this.container.appendChild(wings);
+
+    // Inverted warning
+    this.invertedLabel = document.createElement('div');
+    this.invertedLabel.className = 'inverted-label';
+    this.invertedLabel.textContent = 'INVERTED';
+    this.container.appendChild(this.invertedLabel);
 
     // ── Cockpit frame — cinematic dark gradient with subtle struts ──
     const frame = document.createElement('div');
@@ -494,18 +558,18 @@ export class HUD3D {
       this.speedLinesEl.style.opacity = '0';
     }
 
-    // ── Artificial horizon — update roll and pitch from player ship orientation ──
+    // ── Pitch ladder — update roll and pitch from player ship orientation ──
     if (camera) {
       this._euler.setFromQuaternion(player.group.quaternion, 'ZXY');
       const roll = this._euler.z;   // radians, 0 = level
       const pitch = this._euler.x;  // radians, negative = nose up
-      // Pitch shifts the line vertically: nose up moves line down, nose down moves line up
-      const pitchOffset = Math.max(-40, Math.min(40, pitch * 40));
-      this.horizonLine.style.transform = `translate(-50%, ${pitchOffset}px) rotate(${-roll}rad)`;
+      const pitchDeg = pitch * (180 / Math.PI);
+      const pxPerDeg = 3.2;
+      const pitchOffset = pitchDeg * pxPerDeg;
+      this.ladderInner.style.transform = `translate(-50%, ${pitchOffset}px) rotate(${-roll}rad)`;
       // Show INVERTED label when rolled past ~120 degrees
-      const absRoll = Math.abs(roll);
-      const inverted = absRoll > Math.PI * 0.65;
-      this.horizonLabel.style.opacity = inverted ? '1' : '0';
+      const inverted = Math.abs(roll) > Math.PI * 0.65;
+      this.invertedLabel.style.opacity = inverted ? '1' : '0';
     }
 
     if (player.damagePct > 0.75) {
