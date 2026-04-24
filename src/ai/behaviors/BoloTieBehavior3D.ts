@@ -52,7 +52,7 @@ export class BoloTieBehavior3D implements AIBehavior3D {
     const forward = self.getForward();
     const toPlayer = this._tmpVec.subVectors(target.position, self.position).normalize();
     const facing = forward.dot(toPlayer);
-    const engageRange = leashRange * 0.5;
+    const engageRange = leashRange * 0.7; // break off earlier — stay at distance
 
     if (dist > leashRange && this.phase !== 'chase') this._setPhase('chase');
 
@@ -147,9 +147,9 @@ export class BoloTieBehavior3D implements AIBehavior3D {
     this.isCharging = false;
     const r = (chaos(this.timer, this.seed) + 1) * 0.5;
     switch (phase) {
-      case 'chase':     this.phaseDuration = 6; break; // longer chase — slower to react
+      case 'chase':     this.phaseDuration = 3; break; // short chase — quickly returns to orbiting
       case 'evade': {
-        this.phaseDuration = 6.0 + r * 4.0; // long lazy evades
+        this.phaseDuration = 8.0 + r * 5.0; // very long lazy evades
         this.maneuverDir *= -1;
         // Heavily weighted toward wide_orbit — signature move
         const maneuvers: Maneuver[] = ['wide_orbit','wide_orbit','wide_orbit','wide_orbit','break_turn','climb_roll','throttle_cut'];

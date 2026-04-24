@@ -59,7 +59,7 @@ export class RustyBehavior3D implements AIBehavior3D {
     const forward = self.getForward();
     const toPlayer = this._tmpVec.subVectors(target.position, self.position).normalize();
     const facing = forward.dot(toPlayer); // >0 = pointing at player
-    const engageRange = leashRange * 0.55;
+    const engageRange = leashRange * 0.7;
 
     // ── Positional awareness — is the enemy behind the player? ──
     const playerFwd = target.getForward();
@@ -282,11 +282,11 @@ export class RustyBehavior3D implements AIBehavior3D {
     const r = (chaos(this.timer, this.seed) + 1) * 0.5;
 
     switch (phase) {
-      case 'chase':     this.phaseDuration = 4; break;
-      case 'flank':     this.phaseDuration = 3 + r * 2; break;     // 3-5s to reposition
-      case 'tail':      this.phaseDuration = 3 + r * 3; break;     // 3-6s on the six
+      case 'chase':     this.phaseDuration = 2; break;              // brief chase
+      case 'flank':     this.phaseDuration = 5 + r * 3; break;     // 5-8s flanking at distance
+      case 'tail':      this.phaseDuration = 2 + r * 2; break;     // 2-4s on the six then break off
       case 'evade': {
-        this.phaseDuration = 4.5 + r * 3.0; // 4.5-7.5s
+        this.phaseDuration = 7.0 + r * 4.0; // 7-11s long evasion
         this.maneuverDir *= -1;
 
         // Pick maneuver — weighted toward repositioning moves

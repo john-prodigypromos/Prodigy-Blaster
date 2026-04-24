@@ -384,16 +384,31 @@ export function updateArena(
     // Apply physics so enemies fly with real velocity, drag, and momentum
     applyShipPhysics(enemy, aiInput, effectiveDt, now);
 
-    // ── Hard physics leash — full velocity override when too far ──
-    // Wipe ALL velocity and set it straight toward the player.
-    // No jink, no chaos, no sideways drift can fight this.
-    _projTmp.subVectors(player.position, enemy.position);
+    // ── Hard proximity repulsion — push enemies away when too close ──
+    _projTmp.subVectors(enemy.position, player.position);
     const dist = _projTmp.length();
+    const MIN_DIST = 80; // hard minimum distance
+    const SOFT_DIST = 120; // soft zone — gradually push away
+    if (dist < MIN_DIST) {
+      // Hard override — slam velocity directly away from player
+      _projTmp.divideScalar(dist); // normalize away from player
+      const pushSpeed = PHYSICS.MAX_VELOCITY * enemy.speedMult * 0.8;
+      enemy.velocity.copy(_projTmp).multiplyScalar(pushSpeed);
+    } else if (dist < SOFT_DIST) {
+      // Soft push — blend away-velocity proportionally
+      const blend = 1 - (dist - MIN_DIST) / (SOFT_DIST - MIN_DIST);
+      _projTmp.divideScalar(dist);
+      const pushSpeed = PHYSICS.MAX_VELOCITY * enemy.speedMult * 0.5 * blend;
+      enemy.velocity.addScaledVector(_projTmp, pushSpeed);
+    }
+
+    // ── Hard physics leash — full velocity override when too far ──
     if (dist > LEASH_DIST) {
-      _projTmp.divideScalar(dist); // normalize toward player
-      const returnSpeed = Math.min(dist * 0.5, PHYSICS.MAX_VELOCITY * enemy.speedMult);
+      _projTmp.subVectors(player.position, enemy.position);
+      const d = _projTmp.length();
+      _projTmp.divideScalar(d); // normalize toward player
+      const returnSpeed = Math.min(d * 0.5, PHYSICS.MAX_VELOCITY * enemy.speedMult);
       enemy.velocity.copy(_projTmp).multiplyScalar(returnSpeed);
-      // Also point the ship toward the player so steering doesn't fight
       enemy.group.lookAt(player.position);
     }
   }

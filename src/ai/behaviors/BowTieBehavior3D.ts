@@ -48,7 +48,7 @@ export class BowTieBehavior3D implements AIBehavior3D {
     const forward = self.getForward();
     const toPlayer = this._tmpVec.subVectors(target.position, self.position).normalize();
     const facing = forward.dot(toPlayer);
-    const engageRange = leashRange * 0.5;
+    const engageRange = leashRange * 0.7; // break off earlier
 
     if (dist > leashRange && this.phase !== 'chase') this._setPhase('chase');
 
@@ -168,9 +168,9 @@ export class BowTieBehavior3D implements AIBehavior3D {
     this.phaseTimer = 0;
     const r = (chaos(this.timer, this.seed) + 1) * 0.5;
     switch (phase) {
-      case 'chase':     this.phaseDuration = 4; break; // shorter chase — attacks faster
+      case 'chase':     this.phaseDuration = 2.5; break; // brief chase then back to maneuvers
       case 'evade': {
-        this.phaseDuration = 4.5 + r * 3.0;
+        this.phaseDuration = 7.0 + r * 4.0; // long vertical maneuver sequences
         this.maneuverDir *= -1;
         // Heavily weighted toward vertical maneuvers
         const maneuvers: Maneuver[] = ['yo_yo','yo_yo','yo_yo','dive_pull','dive_pull','split_s','split_s','climb_roll','scissors'];

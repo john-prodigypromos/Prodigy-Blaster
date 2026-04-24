@@ -54,7 +54,7 @@ export class BishopBehavior3D implements AIBehavior3D {
     const forward = self.getForward();
     const toPlayer = this._tmpVec.subVectors(target.position, self.position).normalize();
     const facing = forward.dot(toPlayer);
-    const engageRange = leashRange * 0.5;
+    const engageRange = leashRange * 0.7; // break off earlier
 
     if (hpPct <= 0.2 && this.bossPhase !== 'phase3') this.bossPhase = 'phase3';
     else if (hpPct <= 0.5 && this.bossPhase === 'phase1') {
@@ -207,9 +207,9 @@ export class BishopBehavior3D implements AIBehavior3D {
     const berserk = this.bossPhase === 'phase3' ? 0.5 : 1;
     const r = (chaos(this.timer, this.seed) + 1) * 0.5;
     switch (phase) {
-      case 'chase':     this.phaseDuration = 3; break; // short chase — constantly shifting
+      case 'chase':     this.phaseDuration = 2; break; // very brief chase — constantly shifting
       case 'evade': {
-        this.phaseDuration = (3.5 + r * 3.0) * berserk; // shorter, more frequent phase changes
+        this.phaseDuration = (6.0 + r * 4.0) * berserk; // long erratic evasion sequences
         this.maneuverDir *= -1;
         // Ghost maneuvers — corkscrew, feints, snap turns
         const maneuvers: Maneuver[] = ['corkscrew','corkscrew','corkscrew','feint','feint','snap_turn','snap_turn','dive_pull','scissors','throttle_cut'];
