@@ -947,9 +947,9 @@ export function createBlackHole(scene: THREE.Scene): LevelEnvironment {
   scene.add(group);
 
   // ── Gravity — pulls ships that fly close ──
-  const GRAVITY_STRENGTH = 600;
+  const GRAVITY_STRENGTH = 3000;
   const EVENT_HORIZON = 60; // match singularity radius
-  const MAX_EFFECT_DIST = 600;
+  const MAX_EFFECT_DIST = 1200; // felt from much further out
   const _toHole = new THREE.Vector3();
 
   function applyGravity(entity: Ship3D, dt: number): void {
@@ -961,7 +961,10 @@ export function createBlackHole(scene: THREE.Scene): LevelEnvironment {
       return;
     }
     if (dist < MAX_EFFECT_DIST) {
-      const force = GRAVITY_STRENGTH / (dist * dist) * dt;
+      // Inverse-square gravity with stronger close-range scaling
+      const normalizedDist = dist / MAX_EFFECT_DIST;
+      const pullCurve = 1 / (normalizedDist * normalizedDist + 0.01);
+      const force = GRAVITY_STRENGTH * pullCurve * dt / (MAX_EFFECT_DIST * MAX_EFFECT_DIST);
       _toHole.normalize();
       entity.velocity.addScaledVector(_toHole, force * 60);
     }
