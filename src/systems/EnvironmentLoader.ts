@@ -947,7 +947,7 @@ export function createBlackHole(scene: THREE.Scene): LevelEnvironment {
   scene.add(group);
 
   // ── Gravity — pulls ships that fly close ──
-  const GRAVITY_STRENGTH = 6000;
+  const GRAVITY_STRENGTH = 12000;
   const EVENT_HORIZON = 60; // match singularity radius
   const MAX_EFFECT_DIST = 1200; // felt from much further out
   const _toHole = new THREE.Vector3();
