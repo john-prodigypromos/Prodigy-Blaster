@@ -57,6 +57,8 @@ export class HUD3D {
   private landingStatusTimer = 0;
   private lastStatusText = '';
   private missionPhase: 'launch' | 'combat' | 'landing' | null = null;
+  // Pre-allocated to avoid per-frame Vector3 garbage in the project calls
+  private _projTmp = new THREE.Vector3();
 
   constructor() {
     const overlay = document.getElementById('ui-overlay')!;
@@ -448,7 +450,8 @@ export class HUD3D {
 
     this.scoreEl.textContent = score.toLocaleString();
 
-    const alive = enemies.filter(e => e.alive).length;
+    let alive = 0;
+    for (const e of enemies) if (e.alive) alive++;
     const total = enemies.length;
     this.targetsEl.textContent = `${total - alive}/${total}`;
     this.levelEl.textContent = String(level);
@@ -462,174 +465,191 @@ export class HUD3D {
     }
   }
 
-  private enemyHUDs: HTMLDivElement[] = [];
+  /** Pooled enemy HUD slots — create DOM once per slot, update properties each frame. */
+  private enemySlots: {
+    outer: HTMLDivElement;
+    arrow: HTMLDivElement;
+    portrait: HTMLImageElement | null;
+    barBg: HTMLDivElement;
+    barFill: HTMLDivElement;
+    label: HTMLDivElement;
+    marker: HTMLDivElement;
+  }[] = [];
+
+  private ensureEnemySlot(i: number): HUD3D['enemySlots'][number] {
+    while (this.enemySlots.length <= i) {
+      const idx = this.enemySlots.length;
+      const outer = document.createElement('div');
+      outer.style.cssText = 'position:fixed;pointer-events:none;z-index:22;text-align:center;display:none;';
+
+      const arrow = document.createElement('div');
+      arrow.style.cssText = 'width:0;height:0;border-left:10px solid transparent;border-right:10px solid transparent;border-bottom:18px solid #ff4444;filter:drop-shadow(0 0 4px rgba(255,0,0,0.6));margin:0 auto;display:none;';
+      outer.appendChild(arrow);
+
+      let portrait: HTMLImageElement | null = null;
+      const portraitFile = ENEMY_PORTRAITS[idx];
+      if (portraitFile) {
+        portrait = document.createElement('img');
+        portrait.src = `/portraits/${portraitFile}`;
+        portrait.style.cssText = 'object-fit:cover;border-radius:50%;display:none;margin:2px auto 0;';
+        outer.appendChild(portrait);
+      }
+
+      const barBg = document.createElement('div');
+      barBg.style.cssText = 'background:rgba(0,0,0,0.7);border-radius:2px;overflow:hidden;margin:4px auto 0;display:none;';
+      const barFill = document.createElement('div');
+      barFill.style.cssText = 'height:100%;';
+      barBg.appendChild(barFill);
+      outer.appendChild(barBg);
+
+      const label = document.createElement('div');
+      label.style.cssText = 'font-family:var(--font-body);white-space:nowrap;letter-spacing:1px;margin-top:2px;display:none;';
+      outer.appendChild(label);
+
+      const marker = document.createElement('div');
+      marker.style.cssText = 'width:8px;height:8px;transform:rotate(45deg);margin:0 auto;display:none;';
+      outer.appendChild(marker);
+
+      this.container.appendChild(outer);
+      this.enemySlots.push({ outer, arrow, portrait, barBg, barFill, label, marker });
+    }
+    return this.enemySlots[i];
+  }
 
   private updateTargetIndicators(player: Ship3D, enemies: Ship3D[], camera?: THREE.PerspectiveCamera, lockedTargetIndex = -1): void {
-    // Remove old HUDs
-    for (const m of this.enemyHUDs) m.remove();
-    this.enemyHUDs = [];
-
-    if (!camera) return;
+    if (!camera) {
+      for (const s of this.enemySlots) s.outer.style.display = 'none';
+      return;
+    }
 
     const w = window.innerWidth;
     const h = window.innerHeight;
 
+    // Hide any slots beyond the current enemy count (e.g. if a level had fewer enemies)
+    for (let j = enemies.length; j < this.enemySlots.length; j++) {
+      this.enemySlots[j].outer.style.display = 'none';
+    }
+
     for (let i = 0; i < enemies.length; i++) {
+      const slot = this.ensureEnemySlot(i);
       const enemy = enemies[i];
-      if (!enemy.alive) continue;
 
-      // Skip this enemy if the persistent lock overlay is handling it
-      if (this.wasInLockZone && i === this.lockedEnemyIdx) continue;
-
-      // Project enemy position to screen, then offset upward in screen space
-      // so the label stays a consistent pixel distance above the ship at any range
-      const labelPos = enemy.position.clone();
-      const pos = labelPos.project(camera);
-
-      const sx = (pos.x * 0.5 + 0.5) * w;
-      const sy = (-pos.y * 0.5 + 0.5) * h - 70; // 70px above projected ship center
-      const behind = pos.z > 1;
-
-      const onScreen = !behind && sx > 30 && sx < w - 30 && sy > 30 && sy < h - 30;
-
-      if (!onScreen) {
-        // ── Off-screen tracker — always pinned to screen EDGE ──
-        const tracker = document.createElement('div');
-        tracker.style.cssText = 'position:fixed;pointer-events:none;z-index:22;text-align:center;';
-
-        // Get direction from screen center to projected position
-        let dirX = sx - w / 2;
-        let dirY = sy - h / 2;
-        // If enemy is behind camera, flip the direction
-        if (behind) { dirX = -dirX; dirY = -dirY; }
-        // Avoid zero vector
-        if (Math.abs(dirX) < 1 && Math.abs(dirY) < 1) dirX = 1;
-
-        // Project direction onto screen edge using line-box intersection
-        const margin = 60;
-        const halfW = w / 2 - margin;
-        const halfH = h / 2 - margin;
-
-        // Scale factor to reach the edge
-        const scaleX = Math.abs(dirX) > 0.01 ? halfW / Math.abs(dirX) : 9999;
-        const scaleY = Math.abs(dirY) > 0.01 ? halfH / Math.abs(dirY) : 9999;
-        const scale = Math.min(scaleX, scaleY);
-
-        const edgeX = w / 2 + dirX * scale;
-        const edgeY = h / 2 + dirY * scale;
-
-        // Arrow angle pointing toward the enemy
-        const angle = Math.atan2(dirY, dirX);
-
-        tracker.style.left = edgeX + 'px';
-        tracker.style.top = edgeY + 'px';
-        tracker.style.transform = 'translate(-50%,-50%)';
-
-        // Arrow triangle
-        const arrow = document.createElement('div');
-        arrow.style.cssText = `
-          width:0;height:0;
-          border-left:10px solid transparent;border-right:10px solid transparent;
-          border-bottom:18px solid #ff4444;
-          transform:rotate(${angle - Math.PI / 2}rad);
-          filter:drop-shadow(0 0 4px rgba(255,0,0,0.6));
-          margin:0 auto;
-        `;
-        tracker.appendChild(arrow);
-
-        // Portrait + label row
-        const dist = Math.round(enemy.position.distanceTo(player.position));
-        const labelRow = document.createElement('div');
-        labelRow.style.cssText = 'display:flex;align-items:center;gap:4px;margin-top:2px;justify-content:center;';
-
-        const portraitFile = ENEMY_PORTRAITS[i];
-        if (portraitFile) {
-          const img = document.createElement('img');
-          img.src = `/portraits/${portraitFile}`;
-          img.style.cssText = 'width:42px;height:42px;border-radius:50%;object-fit:cover;border:2px solid #ff4444;filter:drop-shadow(0 0 3px rgba(255,0,0,0.4));';
-          labelRow.appendChild(img);
-        }
-
-        const label = document.createElement('div');
-        label.textContent = `${ENEMY_NAMES[i] ?? `ENEMY ${i + 1}`} [${dist}m]`;
-        label.style.cssText = 'font-size:10px;color:#ff4444;font-family:var(--font-body);white-space:nowrap;';
-        labelRow.appendChild(label);
-        tracker.appendChild(labelRow);
-
-        this.container.appendChild(tracker);
-        this.enemyHUDs.push(tracker);
+      if (!enemy.alive || (this.wasInLockZone && i === this.lockedEnemyIdx)) {
+        slot.outer.style.display = 'none';
         continue;
       }
 
+      const pos = this._projTmp.copy(enemy.position).project(camera);
+      const sx = (pos.x * 0.5 + 0.5) * w;
+      const sy = (-pos.y * 0.5 + 0.5) * h - 70;
+      const behind = pos.z > 1;
+      const onScreen = !behind && sx > 30 && sx < w - 30 && sy > 30 && sy < h - 30;
+
+      slot.outer.style.display = 'block';
+      slot.outer.style.transform = 'translate(-50%,-50%)';
+
+      if (!onScreen) {
+        // Off-screen: arrow at edge + small portrait + label
+        let dirX = sx - w / 2;
+        let dirY = sy - h / 2;
+        if (behind) { dirX = -dirX; dirY = -dirY; }
+        if (Math.abs(dirX) < 1 && Math.abs(dirY) < 1) dirX = 1;
+
+        const margin = 60;
+        const halfW = w / 2 - margin;
+        const halfH = h / 2 - margin;
+        const scaleX = Math.abs(dirX) > 0.01 ? halfW / Math.abs(dirX) : 9999;
+        const scaleY = Math.abs(dirY) > 0.01 ? halfH / Math.abs(dirY) : 9999;
+        const scale = Math.min(scaleX, scaleY);
+        const edgeX = w / 2 + dirX * scale;
+        const edgeY = h / 2 + dirY * scale;
+        const angle = Math.atan2(dirY, dirX);
+
+        slot.outer.style.left = edgeX + 'px';
+        slot.outer.style.top = edgeY + 'px';
+
+        slot.arrow.style.display = 'block';
+        slot.arrow.style.transform = `rotate(${angle - Math.PI / 2}rad)`;
+        slot.arrow.style.borderBottomColor = '#ff4444';
+
+        if (slot.portrait) {
+          slot.portrait.style.display = 'block';
+          slot.portrait.style.width = '42px';
+          slot.portrait.style.height = '42px';
+          slot.portrait.style.border = '2px solid #ff4444';
+          slot.portrait.style.filter = 'drop-shadow(0 0 3px rgba(255,0,0,0.4))';
+        }
+
+        slot.barBg.style.display = 'none';
+        slot.marker.style.display = 'none';
+
+        const dist = Math.round(enemy.position.distanceTo(player.position));
+        slot.label.style.display = 'block';
+        slot.label.style.fontSize = '10px';
+        slot.label.style.fontWeight = 'normal';
+        slot.label.style.color = '#ff4444';
+        slot.label.style.textShadow = 'none';
+        slot.label.textContent = `${ENEMY_NAMES[i] ?? `ENEMY ${i + 1}`} [${dist}m]`;
+        continue;
+      }
+
+      // On-screen
       const isLocked = i === lockedTargetIndex;
-      // Only show lock styling if target is within center 33% of screen
       const inLockZone = isLocked && Math.abs(pos.x) < 0.33 && Math.abs(pos.y) < 0.33;
       const borderColor = inLockZone ? '#00ff66' : '#ff4444';
       const glowColor = inLockZone ? 'rgba(0,255,102,0.6)' : 'rgba(255,0,0,0.5)';
       const textColor = inLockZone ? '#00ff66' : '#ff4444';
 
-      // Scale indicator based on distance — smaller at range so it doesn't obscure the ship
       const onScreenDist = Math.round(enemy.position.distanceTo(player.position));
       const distScale = Math.max(0.3, Math.min(1.0, 60 / Math.max(onScreenDist, 1)));
-      const portraitSize = Math.round(54 * distScale);
-      const barWidth = Math.round(54 * distScale);
-      const fontSize = Math.max(7, Math.round(10 * distScale));
       const showDetails = distScale > 0.4;
 
-      const hud = document.createElement('div');
-      hud.style.cssText = `
-        position:fixed;pointer-events:none;z-index:22;text-align:center;
-        left:${sx}px;top:${sy}px;transform:translate(-50%,-50%);
-      `;
+      slot.outer.style.left = sx + 'px';
+      slot.outer.style.top = sy + 'px';
+      slot.arrow.style.display = 'none';
 
       if (showDetails) {
-        // Portrait (scaled by distance)
-        const portraitFile = ENEMY_PORTRAITS[i];
-        if (portraitFile) {
-          const img = document.createElement('img');
-          img.src = `/portraits/${portraitFile}`;
-          img.style.cssText = `width:${portraitSize}px;height:${portraitSize}px;border-radius:50%;object-fit:cover;border:2px solid ${borderColor};filter:drop-shadow(0 0 ${Math.round(6 * distScale)}px ${glowColor});display:block;margin:0 auto;`;
-          hud.appendChild(img);
+        const portraitSize = Math.round(54 * distScale);
+        const barWidth = Math.round(54 * distScale);
+        const barH = Math.max(3, Math.round(6 * distScale));
+        const fontSize = Math.max(7, Math.round(10 * distScale));
+        const dropShadowPx = Math.round(6 * distScale);
+
+        if (slot.portrait) {
+          slot.portrait.style.display = 'block';
+          slot.portrait.style.width = portraitSize + 'px';
+          slot.portrait.style.height = portraitSize + 'px';
+          slot.portrait.style.border = `2px solid ${borderColor}`;
+          slot.portrait.style.filter = `drop-shadow(0 0 ${dropShadowPx}px ${glowColor})`;
         }
 
-        // Health bar
-        const barBg = document.createElement('div');
-        barBg.style.cssText = `
-          width:${barWidth}px;height:${Math.max(3, Math.round(6 * distScale))}px;background:rgba(0,0,0,0.7);
-          border:1px solid ${borderColor};border-radius:2px;overflow:hidden;
-          margin:${Math.round(4 * distScale)}px auto 0;
-        `;
-        const barFill = document.createElement('div');
+        slot.barBg.style.display = 'block';
+        slot.barBg.style.width = barWidth + 'px';
+        slot.barBg.style.height = barH + 'px';
+        slot.barBg.style.border = `1px solid ${borderColor}`;
+        slot.barBg.style.margin = `${Math.round(4 * distScale)}px auto 0`;
+
         const hpPct = Math.max(0, (1 - enemy.damagePct) * 100);
-        barFill.style.cssText = `
-          width:${hpPct}%;height:100%;
-          background:linear-gradient(90deg, ${inLockZone ? '#008844' : '#cc0000'}, ${inLockZone ? '#00ff66' : '#ff4444'});
-        `;
-        barBg.appendChild(barFill);
-        hud.appendChild(barBg);
+        slot.barFill.style.width = `${hpPct}%`;
+        slot.barFill.style.background = `linear-gradient(90deg, ${inLockZone ? '#008844' : '#cc0000'}, ${inLockZone ? '#00ff66' : '#ff4444'})`;
 
-        // Name + distance
-        const label = document.createElement('div');
-        label.textContent = `${ENEMY_NAMES[i] ?? `ENEMY ${i + 1}`} [${onScreenDist}m]`;
-        label.style.cssText = `
-          font-size:${fontSize}px;font-weight:bold;color:${textColor};font-family:var(--font-body);
-          letter-spacing:1px;margin-top:2px;
-          text-shadow:0 0 4px ${glowColor};
-        `;
-        hud.appendChild(label);
+        slot.label.style.display = 'block';
+        slot.label.style.fontSize = fontSize + 'px';
+        slot.label.style.fontWeight = 'bold';
+        slot.label.style.color = textColor;
+        slot.label.style.textShadow = `0 0 4px ${glowColor}`;
+        slot.label.textContent = `${ENEMY_NAMES[i] ?? `ENEMY ${i + 1}`} [${onScreenDist}m]`;
+
+        slot.marker.style.display = 'none';
       } else {
-        // At extreme distance — just a small diamond marker
-        const marker = document.createElement('div');
-        marker.style.cssText = `
-          width:8px;height:8px;background:${borderColor};
-          transform:rotate(45deg);margin:0 auto;
-          box-shadow:0 0 6px ${glowColor};
-        `;
-        hud.appendChild(marker);
+        // Tiny distant marker — everything else off
+        if (slot.portrait) slot.portrait.style.display = 'none';
+        slot.barBg.style.display = 'none';
+        slot.label.style.display = 'none';
+        slot.marker.style.display = 'block';
+        slot.marker.style.background = borderColor;
+        slot.marker.style.boxShadow = `0 0 6px ${glowColor}`;
       }
-
-      this.container.appendChild(hud);
-      this.enemyHUDs.push(hud);
     }
   }
 
@@ -647,7 +667,7 @@ export class HUD3D {
     }
 
     // Project enemy to screen — same offset as enemy HUD portrait (70px above center)
-    const pos = enemy.position.clone().project(camera);
+    const pos = this._projTmp.copy(enemy.position).project(camera);
     const w = window.innerWidth;
     const h = window.innerHeight;
     const sx = (pos.x * 0.5 + 0.5) * w;

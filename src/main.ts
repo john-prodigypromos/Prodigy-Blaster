@@ -477,6 +477,11 @@ function startArena(): void {
     playerColor,
   );
 
+  // Pre-compile all materials now visible in the scene. Avoids 50-250ms
+  // synchronous shader-compile stalls the first time each material is drawn
+  // (which is what causes the periodic "freeze" feel during combat).
+  bundle.renderer.compile(bundle.scene, bundle.camera);
+
   hud = new HUD3D();
   crosshairEl.style.display = 'block';
 

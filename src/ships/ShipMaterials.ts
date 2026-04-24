@@ -16,13 +16,13 @@ function getSharedTextures() {
 }
 
 export interface ShipMaterialSet {
-  hull: THREE.MeshPhysicalMaterial;
-  cockpit: THREE.MeshPhysicalMaterial;
+  hull: THREE.Material;                // PlayerMaterials still uses MeshPhysicalMaterial, enemy uses MeshLambert
+  cockpit: THREE.Material;
   engine: THREE.MeshStandardMaterial;
   nozzle: THREE.MeshBasicMaterial;
   engineLight: THREE.PointLight;
-  accent?: THREE.MeshStandardMaterial;     // red accent strip lighting
-  armorDark?: THREE.MeshPhysicalMaterial;  // darker armor panels
+  accent?: THREE.MeshStandardMaterial;  // red accent strip lighting
+  armorDark?: THREE.Material;           // darker armor panels
 }
 
 /** Player ship materials — brushed steel hull with character-colored accent lighting. */
@@ -150,49 +150,31 @@ function createBrushedMetalMap(size: number, seed: number): THREE.CanvasTexture 
   return tex;
 }
 
-/** Enemy ship materials — solid metallic black, mirror-shine, red accent lighting.
- *  Piano-black stealth fighter look — no texture, pure gloss. */
+/** Enemy ship materials — simplified flat-shaded Lambert for cheap rendering.
+ *  Dropped clearcoat / normalMap / roughnessMap from PhysicalMaterial → huge
+ *  shader-compile + per-pixel savings. The ship reads as "dark grey armored
+ *  fighter" visually, just without the showroom-car gloss. */
 export function createEnemyMaterials(): ShipMaterialSet {
-  // Main hull — Cool Grey 2C with riveted texture
-  const { normalMap, roughnessMap } = getSharedTextures();
-  const hull = new THREE.MeshPhysicalMaterial({
+  // Main hull — solid Cool Grey, no textures, no clearcoat
+  const hull = new THREE.MeshLambertMaterial({
     color: 0xcbcac8,
-    metalness: 0.6,
-    roughness: 0.15,
-    clearcoat: 0.8,
-    clearcoatRoughness: 0.05,
-    reflectivity: 0.8,
-    emissive: 0x333336,
+    emissive: 0x222225,
     emissiveIntensity: 0.15,
-    normalMap: normalMap,
-    roughnessMap: roughnessMap,
     side: THREE.DoubleSide,
   });
 
-  // Armor panels — same solid black, slightly different sheen
-  const armorDark = new THREE.MeshPhysicalMaterial({
-    color: 0xa8a7a5,
-    metalness: 0.6,
-    roughness: 0.2,
-    clearcoat: 0.8,
-    clearcoatRoughness: 0.05,
-    emissive: 0x2a2a2d,
-    emissiveIntensity: 0.12,
-    normalMap: normalMap,
-    roughnessMap: roughnessMap,
+  // Armor panels — slightly darker flat lambert
+  const armorDark = new THREE.MeshLambertMaterial({
+    color: 0x8a8988,
+    emissive: 0x1a1a1d,
+    emissiveIntensity: 0.1,
   });
 
-  // Cockpit — darker silver chrome visor
-  const cockpit = new THREE.MeshPhysicalMaterial({
-    color: 0x2a2e35,
-    emissive: 0x1a1e25,
-    emissiveIntensity: 0.2,
-    metalness: 1.0,
-    roughness: 0.0,
-    clearcoat: 1.0,
-    clearcoatRoughness: 0.0,
-    reflectivity: 1.0,
-    envMapIntensity: 2.0,
+  // Cockpit — dark lambert with subtle emissive, no transmission/clearcoat
+  const cockpit = new THREE.MeshLambertMaterial({
+    color: 0x1a1e25,
+    emissive: 0x0a0e15,
+    emissiveIntensity: 0.3,
   });
 
   // Red accent strip material — subtle edge lighting
