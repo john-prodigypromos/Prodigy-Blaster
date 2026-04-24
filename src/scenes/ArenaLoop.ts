@@ -481,6 +481,26 @@ export function updateArena(
           particles.spawnShockwave(deathPos);
           state.score += 500;
           evt.target.group.visible = false;
+
+          // ── Enemy kill portrait flash — large fading avatar ──
+          const killIdx = enemies.indexOf(evt.target);
+          const killPortraitFiles = ['bolo-tie.jpg', 'bow-tie.jpg', 'bishop.jpg'];
+          const killFile = killPortraitFiles[killIdx];
+          if (killFile) {
+            const killOverlay = document.createElement('div');
+            killOverlay.style.cssText = `
+              position:fixed;top:40px;left:50%;transform:translateX(-50%);
+              width:min(1000px,90vw);pointer-events:none;z-index:35;
+              text-align:center;opacity:0.6;transition:opacity 1.2s ease-out;
+            `;
+            const killImg = document.createElement('img');
+            killImg.src = `/portraits/${killFile}?v=2`;
+            killImg.style.cssText = 'width:100%;height:auto;object-fit:contain;filter:grayscale(0.3) drop-shadow(0 0 40px rgba(255,0,0,0.4));';
+            killOverlay.appendChild(killImg);
+            document.getElementById('ui-overlay')?.appendChild(killOverlay);
+            requestAnimationFrame(() => { killOverlay.style.opacity = '0'; });
+            setTimeout(() => killOverlay.remove(), 1400);
+          }
         }
         state.sound.explosion();
 
