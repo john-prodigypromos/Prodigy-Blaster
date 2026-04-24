@@ -48,9 +48,9 @@ export function createRenderer(canvas: HTMLCanvasElement): RendererBundle {
   const composer = new EffectComposer(renderer);
   composer.addPass(new RenderPass(scene, camera));
 
-  // Bloom — reduced on mobile for performance
+  // Bloom — always half-res. Upscaling hides the detail loss; cost drops 4x.
   const bloomPass = new UnrealBloomPass(
-    new THREE.Vector2(isMobile ? w / 2 : w, isMobile ? h / 2 : h),
+    new THREE.Vector2(w / 2, h / 2),
     isMobile ? 0.3 : 0.55,   // strength
     isMobile ? 0.3 : 0.5,    // radius
     isMobile ? 0.9 : 0.82,   // threshold — higher on mobile = fewer pixels caught
@@ -75,4 +75,5 @@ export function handleRendererResize(bundle: RendererBundle): void {
   bundle.camera.updateProjectionMatrix();
   bundle.renderer.setSize(w, h);
   bundle.composer.setSize(w, h);
+  bundle.bloomPass.setSize(w / 2, h / 2);
 }

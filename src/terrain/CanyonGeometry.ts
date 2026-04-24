@@ -505,11 +505,6 @@ export function createProdigyMonolith(): THREE.Group {
   logoMesh.position.set(0, 0, slabD * 0.5 + 1.5);
   group.add(logoMesh);
 
-  // ── Strong accent light ──
-  const accentLight = new THREE.PointLight(0xff8844, 2.0, 300, 1.5);
-  accentLight.position.set(0, 0, slabD * 0.5 + 30);
-  group.add(accentLight);
-
   // ── Position: embedded in the end wall, facing the approaching player ──
   // End wall is at z = config.length/2 = 10000, height 1500, width 750.
   // Place the monolith flush against it, centered, at mid-height.
@@ -722,12 +717,7 @@ function createDome(radius: number, px: number, pz: number): THREE.Group {
   base.position.y = radius * 0.09;
   domeGroup.add(base);
 
-  // Inner glow — skip on mobile (7 domes × 1 PointLight = 7 extra lights)
-  if (!IS_MOBILE) {
-    const glowLight = new THREE.PointLight(0x66ddff, 0.5, radius * 3);
-    glowLight.position.y = radius * 0.3;
-    domeGroup.add(glowLight);
-  }
+  // Inner dome glow removed — emissive dome mat + bloom is cheaper
 
   domeGroup.position.set(px, 0, pz);
   return domeGroup;
@@ -850,30 +840,7 @@ export function createBaseColony(): THREE.Group {
   frontLight.position.set(cx - 100, 60, cz + 100);
   group.add(frontLight);
 
-  if (!IS_MOBILE) {
-    // Back fill
-    const backLight = new THREE.PointLight(0xff8822, 1.5, 350);
-    backLight.position.set(cx + 80, 50, cz - 100);
-    group.add(backLight);
-
-    // Cool blue accent lights near the floor — tech/industrial feel
-    const blueLight1 = new THREE.PointLight(0x4488ff, 1, 200);
-    blueLight1.position.set(cx - 60, 5, cz + 60);
-    group.add(blueLight1);
-
-    const blueLight2 = new THREE.PointLight(0x4488ff, 1, 200);
-    blueLight2.position.set(cx + 80, 5, cz - 40);
-    group.add(blueLight2);
-
-    // Red warning lights at cavern entrance edges
-    const redLight1 = new THREE.PointLight(0xff2200, 1.5, 150);
-    redLight1.position.set(120, 30, cz - 80);
-    group.add(redLight1);
-
-    const redLight2 = new THREE.PointLight(0xff2200, 1.5, 150);
-    redLight2.position.set(120, 30, cz + 80);
-    group.add(redLight2);
-  }
+  // Decorative cavern lights removed — mainLight + frontLight + sun cover it
 
   return group;
 }

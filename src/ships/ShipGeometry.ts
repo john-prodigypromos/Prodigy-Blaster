@@ -558,9 +558,6 @@ const _dead = 0; /* [
   const navR = new THREE.PointLight(0x00ff00, 1.5, 8, 2);
   navR.position.set(2.8, 0.3, -0.6);
   group.add(navR);
-  const tailLight = new THREE.PointLight(0x0088ff, 1, 6, 2);
-  tailLight.position.set(0, 0.2, -3.0);
-  group.add(tailLight);
 
   return group;
 }
@@ -687,9 +684,6 @@ export function createEnemyShipGeometry(): THREE.Group {
       emitter.name = 'accent';
       emitter.position.set(x, 0.02, z);
       group.add(emitter);
-      const edgeLight = new THREE.PointLight(0xff2200, 0.6, 3, 2);
-      edgeLight.position.set(x, 0.04, z);
-      group.add(edgeLight);
     }
   }
 
@@ -749,9 +743,6 @@ export function createEnemyShipGeometry(): THREE.Group {
   tip.name = 'accent';
   tip.position.set(0, -0.02, 5.08);
   group.add(tip);
-  const tipLight = new THREE.PointLight(0xff2200, 2, 8, 2);
-  tipLight.position.set(0, -0.02, 5.36);
-  group.add(tipLight);
 
 
 
@@ -887,9 +878,6 @@ export function createEnemyShipGeometry(): THREE.Group {
       ring.name = 'accent';
       ring.position.set(wx, wy, rz);
       group.add(ring);
-      const ringLight = new THREE.PointLight(0xff2200, 0.8, 4, 2);
-      ringLight.position.set(wx, wy, rz);
-      group.add(ringLight);
     }
 
     // Muzzle tip — glowing red barrel end (115% diameter)
@@ -899,11 +887,6 @@ export function createEnemyShipGeometry(): THREE.Group {
     muzzle.name = 'accent';
     muzzle.position.set(wx, wy, 0.7);
     group.add(muzzle);
-
-    // Muzzle glow light
-    const muzzleLight = new THREE.PointLight(0xff2200, 1.0, 4, 2);
-    muzzleLight.position.set(wx, wy, 0.8);
-    group.add(muzzleLight);
   }
 
   // ═══════════════════════════════════════════════════════════
@@ -925,11 +908,6 @@ export function createEnemyShipGeometry(): THREE.Group {
     teStrip.position.set(mx, 0.01, mz);
     teStrip.rotation.y = angle;
     group.add(teStrip);
-    for (const t of [0.2, 0.5, 0.8]) {
-      const edgeLight = new THREE.PointLight(0xff2200, 0.8, 5, 2);
-      edgeLight.position.set(innerX + dx * t, -0.02, innerZ + dz * t);
-      group.add(edgeLight);
-    }
   }
   // Engine accent rings now inside engGroup above
 
@@ -983,28 +961,6 @@ export function createEnemyShipGeometry(): THREE.Group {
   const navR = new THREE.PointLight(0x00ff00, 1.5, 8, 2);
   navR.position.set(2.8, 0.3, -0.5);
   group.add(navR);
-
-  // Tail warning light
-  const tailLight = new THREE.PointLight(0xff2200, 1, 6, 2);
-  tailLight.position.set(0, 0.3, -3.5);
-  group.add(tailLight);
-
-  // ═══════════════════════════════════════════════════════════
-  // ACCENT ILLUMINATION
-  // ═══════════════════════════════════════════════════════════
-  const accentLight1 = new THREE.PointLight(0xff2200, 1.5, 10, 2);
-  accentLight1.position.set(0, 0.5, -0.5);
-  group.add(accentLight1);
-  const accentLight2 = new THREE.PointLight(0xff2200, 1.0, 8, 2);
-  accentLight2.position.set(0, -0.5, -2.2);
-  group.add(accentLight2);
-
-  // Additional accent lights at engine bays
-  for (const side of [-1, 1]) {
-    const engGlow = new THREE.PointLight(0xff2200, 0.8, 6, 2);
-    engGlow.position.set(side * 0.82, -0.05, -3.7);
-    group.add(engGlow);
-  }
 
   return group;
 }

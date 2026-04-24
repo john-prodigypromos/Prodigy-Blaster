@@ -491,80 +491,23 @@ export function updateArena(
         }
         state.sound.explosion();
 
-        // ── PLAYER DEATH — massive full-screen explosion sequence ──
-        // All effects use a CSS class so clearOverlay can bulk-remove them
+        // ── PLAYER DEATH — single big explosion + flash ──
         if (evt.target.isPlayer) {
           state.gameOver = true;
           state.gameOverTime = now;
           const overlay = document.getElementById('ui-overlay')!;
-          cockpitCam.shake(5.0); // extreme shake
+          cockpitCam.shake(5.0);
 
-          // Blinding white flash
           const whiteFlash = document.createElement('div');
           whiteFlash.className = 'death-fx';
-          whiteFlash.style.cssText = `
-            position:fixed;top:0;left:0;width:100%;height:100%;
-            background:white;z-index:50;pointer-events:none;
-            opacity:0.9;transition:opacity 1.5s ease-out;
-          `;
+          whiteFlash.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:white;z-index:50;pointer-events:none;opacity:0.9;transition:opacity 1.5s ease-out;';
           overlay.appendChild(whiteFlash);
           requestAnimationFrame(() => { whiteFlash.style.opacity = '0'; });
-          setTimeout(() => { if (whiteFlash.parentNode) whiteFlash.remove(); }, 1600);
+          setTimeout(() => whiteFlash.remove(), 1600);
 
-          // Multiple screen-center explosions — staggered (guard against stale overlay)
           const cx = window.innerWidth / 2;
           const cy = window.innerHeight / 2;
-          for (let i = 0; i < 5; i++) {
-            setTimeout(() => {
-              if (state.gameOver) { // only spawn if still in gameOver state
-                explosions.spawnDeath(
-                  cx + (Math.random() - 0.5) * 300,
-                  cy + (Math.random() - 0.5) * 200,
-                );
-              }
-            }, i * 200);
-          }
-
-          // Massive center fireball
           explosions.spawnAt(cx, cy, 500, 'boom1', 3.0);
-
-          // Red damage vignette that lingers
-          const deathVignette = document.createElement('div');
-          deathVignette.className = 'death-fx';
-          deathVignette.style.cssText = `
-            position:fixed;top:0;left:0;width:100%;height:100%;
-            z-index:45;pointer-events:none;
-            background:radial-gradient(ellipse at center, transparent 20%, rgba(200,0,0,0.5) 80%, rgba(100,0,0,0.8) 100%);
-            transition:opacity 2.0s ease-out;
-          `;
-          overlay.appendChild(deathVignette);
-          setTimeout(() => {
-            if (deathVignette.parentNode) {
-              deathVignette.style.opacity = '0';
-              setTimeout(() => { if (deathVignette.parentNode) deathVignette.remove(); }, 2100);
-            }
-          }, 1500);
-
-          // Screen crack overlay effect
-          const cracks = document.createElement('div');
-          cracks.className = 'death-fx';
-          cracks.style.cssText = `
-            position:fixed;top:0;left:0;width:100%;height:100%;
-            z-index:46;pointer-events:none;
-            background:
-              linear-gradient(${35 + Math.random()*20}deg, transparent 48%, rgba(255,255,255,0.15) 49%, rgba(255,255,255,0.15) 51%, transparent 52%),
-              linear-gradient(${140 + Math.random()*30}deg, transparent 48%, rgba(255,255,255,0.1) 49%, rgba(255,255,255,0.1) 51%, transparent 52%),
-              linear-gradient(${80 + Math.random()*20}deg, transparent 47%, rgba(255,255,255,0.12) 49%, rgba(255,255,255,0.12) 51%, transparent 53%),
-              linear-gradient(${200 + Math.random()*30}deg, transparent 48%, rgba(255,255,255,0.08) 49.5%, rgba(255,255,255,0.08) 50.5%, transparent 52%);
-            transition:opacity 3.0s ease-out;
-          `;
-          overlay.appendChild(cracks);
-          setTimeout(() => {
-            if (cracks.parentNode) {
-              cracks.style.opacity = '0';
-              setTimeout(() => { if (cracks.parentNode) cracks.remove(); }, 3100);
-            }
-          }, 2000);
         }
       }
     } catch (e) {
@@ -610,40 +553,16 @@ export function updateArena(
 
     const overlay = document.getElementById('ui-overlay');
     if (overlay) {
-      // White flash
       const flash = document.createElement('div');
       flash.className = 'death-fx';
       flash.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:white;z-index:50;pointer-events:none;opacity:0.9;transition:opacity 1.5s ease-out;';
       overlay.appendChild(flash);
       requestAnimationFrame(() => { flash.style.opacity = '0'; });
-      setTimeout(() => { if (flash.parentNode) flash.remove(); }, 1600);
+      setTimeout(() => flash.remove(), 1600);
 
-      // Staggered screen explosions
       const cx = window.innerWidth / 2;
       const cy = window.innerHeight / 2;
-      for (let i = 0; i < 5; i++) {
-        setTimeout(() => {
-          explosions.spawnDeath(
-            cx + (Math.random() - 0.5) * 300,
-            cy + (Math.random() - 0.5) * 200,
-          );
-        }, i * 200);
-      }
       explosions.spawnAt(cx, cy, 500, 'boom1', 3.0);
-
-      // Red vignette
-      const vig = document.createElement('div');
-      vig.className = 'death-fx';
-      vig.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;z-index:45;pointer-events:none;background:radial-gradient(ellipse at center, transparent 20%, rgba(200,0,0,0.5) 80%, rgba(100,0,0,0.8) 100%);transition:opacity 2.0s ease-out;';
-      overlay.appendChild(vig);
-      setTimeout(() => { if (vig.parentNode) { vig.style.opacity = '0'; setTimeout(() => { if (vig.parentNode) vig.remove(); }, 2100); } }, 1500);
-
-      // Screen cracks
-      const cracks = document.createElement('div');
-      cracks.className = 'death-fx';
-      cracks.style.cssText = `position:fixed;top:0;left:0;width:100%;height:100%;z-index:46;pointer-events:none;background:linear-gradient(${35+Math.random()*20}deg,transparent 48%,rgba(255,255,255,0.15) 49%,rgba(255,255,255,0.15) 51%,transparent 52%),linear-gradient(${140+Math.random()*30}deg,transparent 48%,rgba(255,255,255,0.1) 49%,rgba(255,255,255,0.1) 51%,transparent 52%),linear-gradient(${80+Math.random()*20}deg,transparent 47%,rgba(255,255,255,0.12) 49%,rgba(255,255,255,0.12) 51%,transparent 53%);transition:opacity 3.0s ease-out;`;
-      overlay.appendChild(cracks);
-      setTimeout(() => { if (cracks.parentNode) { cracks.style.opacity = '0'; setTimeout(() => { if (cracks.parentNode) cracks.remove(); }, 3100); } }, 2000);
     }
 
     state.gameOver = true;
@@ -681,16 +600,32 @@ export function updateArena(
   }
 }
 
-/** Remove all arena objects from the scene. */
+/** Remove all arena objects from the scene and release GPU resources.
+ *  Disposes geometries + materials only — textures are intentionally kept
+ *  (ShipMaterials caches normalMap/roughnessMap at module level). */
 export function cleanupArena(state: ArenaState, scene: THREE.Scene): void {
+  const disposeGroup = (obj: THREE.Object3D) => {
+    obj.traverse((child) => {
+      if (child instanceof THREE.Mesh) {
+        child.geometry?.dispose();
+        const mat = child.material;
+        if (Array.isArray(mat)) mat.forEach(m => m.dispose());
+        else mat?.dispose();
+      }
+    });
+  };
+
   scene.remove(state.player.group);
+  disposeGroup(state.player.group);
   for (const e of state.enemies) {
     scene.remove(e.group);
+    disposeGroup(e.group);
   }
-  // Bolts and explosions are managed internally
   for (const bolt of state.boltPool.bolts) {
     scene.remove(bolt.mesh);
     scene.remove(bolt.glow);
+    disposeGroup(bolt.mesh);
+    disposeGroup(bolt.glow);
   }
   state.particles.destroy();
   state.environment?.cleanup();
