@@ -224,7 +224,7 @@ export function createArenaState(
 
   // ── Systems ──
   const boltPool = new BoltPool(scene);
-  const explosions = new ExplosionPool();
+  const explosions = new ExplosionPool(scene, camera);
   const particles = new ParticleSystem3D(scene);
   const cockpitCam = new CockpitCamera(camera);
   cockpitCam.snapTo(player);
@@ -467,16 +467,9 @@ export function updateArena(
         }
       }
 
-      // Project enemy position to screen for hit flashes
+      // Hit flash at the world-space impact point — sprite billboards itself
       if (!evt.target.isPlayer) {
-        const w = window.innerWidth;
-        const h = window.innerHeight;
-        const proj = evt.target.position.clone().project(state.camera);
-        if (proj.z < 1) {
-          const ex = (proj.x * 0.5 + 0.5) * w;
-          const ey = (-proj.y * 0.5 + 0.5) * h;
-          explosions.spawnHit(ex, ey);
-        }
+        explosions.spawnHit(evt.target.position);
       }
 
       // DEATH — world-anchored explosion + destruction chunks + shockwave
@@ -628,6 +621,7 @@ export function cleanupArena(state: ArenaState, scene: THREE.Scene): void {
     disposeGroup(bolt.glow);
   }
   state.particles.destroy();
+  state.explosions.destroy();
   state.environment?.cleanup();
   // Safety: clear any fog left by nebula environment
   scene.fog = null;
