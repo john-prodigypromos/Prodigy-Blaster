@@ -143,6 +143,14 @@ export class HUD3D {
       }
       .taunt-popup.visible { opacity:1; }
 
+      /* Desktop only — 2x larger taunt for readability on big screens */
+      @media (min-width: 601px) {
+        .taunt-popup {
+          max-width:840px;padding:24px 44px;
+          font-size:36px;border-radius:10px;
+        }
+      }
+
       /* ── Lock bracket overlay ── */
       .lock-overlay {
         position:fixed;pointer-events:none;z-index:23;

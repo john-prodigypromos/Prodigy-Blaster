@@ -206,7 +206,7 @@ export class SoundSystem {
     crack.buffer = crackBuf;
     const crackGain = ctx.createGain();
     const crackFilter = this.lpf(ctx, 3000);
-    crackGain.gain.setValueAtTime(1.2, now);
+    crackGain.gain.setValueAtTime(0.96, now);
     crackGain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
     crack.connect(crackFilter);
     crackFilter.connect(crackGain);
@@ -219,8 +219,8 @@ export class SoundSystem {
     sub.type = 'sine';
     sub.frequency.setValueAtTime(90, now);
     sub.frequency.exponentialRampToValueAtTime(10, now + 1.5);
-    subGain.gain.setValueAtTime(1.4, now);
-    subGain.gain.setValueAtTime(1.2, now + 0.05);
+    subGain.gain.setValueAtTime(1.12, now);
+    subGain.gain.setValueAtTime(0.96, now + 0.05);
     subGain.gain.exponentialRampToValueAtTime(0.001, now + 2.0);
     sub.connect(subGain);
     subGain.connect(this.masterGain);
@@ -241,7 +241,7 @@ export class SoundSystem {
     rumbleFilter.frequency.exponentialRampToValueAtTime(40, now + 1.8);
     const rumbleGain = ctx.createGain();
     rumbleGain.gain.setValueAtTime(0.001, now);
-    rumbleGain.gain.linearRampToValueAtTime(0.9, now + 0.02);
+    rumbleGain.gain.linearRampToValueAtTime(0.72, now + 0.02);
     rumbleGain.gain.exponentialRampToValueAtTime(0.001, now + 3.0);
     rumble.connect(rumbleFilter);
     rumbleFilter.connect(rumbleGain);
@@ -259,7 +259,7 @@ export class SoundSystem {
     mid.type = 'sawtooth';
     mid.frequency.setValueAtTime(180, now);
     mid.frequency.exponentialRampToValueAtTime(20, now + 1.0);
-    midGain.gain.setValueAtTime(0.7, now);
+    midGain.gain.setValueAtTime(0.56, now);
     midGain.gain.exponentialRampToValueAtTime(0.001, now + 1.5);
     mid.connect(midDist);
     midDist.connect(midFilter);
@@ -275,7 +275,7 @@ export class SoundSystem {
     sub2.frequency.setValueAtTime(60, now + 0.08);
     sub2.frequency.exponentialRampToValueAtTime(8, now + 1.2);
     sub2Gain.gain.setValueAtTime(0.001, now);
-    sub2Gain.gain.linearRampToValueAtTime(1.0, now + 0.1);
+    sub2Gain.gain.linearRampToValueAtTime(0.8, now + 0.1);
     sub2Gain.gain.exponentialRampToValueAtTime(0.001, now + 1.8);
     sub2.connect(sub2Gain);
     sub2Gain.connect(this.masterGain);
@@ -288,7 +288,7 @@ export class SoundSystem {
     pressure.type = 'sine';
     pressure.frequency.setValueAtTime(25, now);
     pressure.frequency.exponentialRampToValueAtTime(8, now + 0.8);
-    pressureGain.gain.setValueAtTime(1.2, now);
+    pressureGain.gain.setValueAtTime(0.96, now);
     pressureGain.gain.exponentialRampToValueAtTime(0.001, now + 1.2);
     pressure.connect(pressureGain);
     pressureGain.connect(this.masterGain);
@@ -412,13 +412,13 @@ export class SoundSystem {
     this.thrusting = false;
   }
 
-  // ── Procedural Industrial Soundtrack (NIN-style) ──
-  // All synthesized via Web Audio API — no audio files.
-  // Distorted bass sequencer, mechanical percussion, dark drone pad.
+  // ── Soundtrack: iron-pulse-circuit.mp3 looped through musicGainNode ──
+  // Single MP3 file, plays forever, never stops once started.
+  // dropToHum / restoreMusic still work because they ride musicGainNode.
   private musicPlaying = false;
   private musicGainNode: GainNode | null = null;
-  private musicNodes: (OscillatorNode | AudioBufferSourceNode)[] = [];
-  private musicTimers: number[] = [];
+  private musicElement: HTMLAudioElement | null = null;
+  private musicSource: MediaElementAudioSourceNode | null = null;
   private musicIntensity = 0.5;
 
   private static isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) ||
@@ -430,234 +430,34 @@ export class SoundSystem {
     if (!ctx || !this.masterGain) return;
     this.musicPlaying = true;
 
-    // Shared distortion curve — aggressive clipping
-    const mkDist = (drive: number) => {
-      const ws = ctx.createWaveShaper();
-      const c = new Float32Array(512);
-      for (let i = 0; i < 512; i++) { c[i] = Math.tanh(((i / 256) - 1) * drive); }
-      ws.curve = c;
-      return ws;
-    };
-
     this.musicGainNode = ctx.createGain();
-    this.musicGainNode.gain.value = 0.55;
+    this.musicGainNode.gain.value = 0.77; // +40% over previous 0.55
     this.musicGainNode.connect(this.masterGain);
 
-    // ── Layer 1: Menacing sub-bass drone — constant oppressive weight ──
-    const subDrone = ctx.createOscillator();
-    const subDroneGain = ctx.createGain();
-    subDrone.type = 'sine';
-    subDrone.frequency.value = 36; // D1 — felt more than heard
-    subDroneGain.gain.value = 0.25;
-    subDrone.connect(subDroneGain);
-    subDroneGain.connect(this.musicGainNode);
-    subDrone.start();
-    this.musicNodes.push(subDrone);
-
-    // ── Layer 2: Grinding drone wall — heavily distorted detuned saws ──
-    const droneFreqs = [55, 55.7, 82.4, 83.3, 110.5]; // A1 cluster + E2 cluster + A2 high
-    for (const freq of droneFreqs) {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      const dist = mkDist(8);
-      const filter = ctx.createBiquadFilter();
-      filter.type = 'lowpass';
-      filter.frequency.value = 350;
-      filter.Q.value = 3;
-      osc.type = 'sawtooth';
-      osc.frequency.value = freq;
-      gain.gain.value = 0.12;
-      osc.connect(dist);
-      dist.connect(filter);
-      filter.connect(gain);
-      gain.connect(this.musicGainNode);
-      osc.start();
-      this.musicNodes.push(osc);
+    if (!this.musicElement) {
+      this.musicElement = new Audio('/audio/iron-pulse-circuit.mp3');
+      this.musicElement.loop = true;
+      this.musicElement.preload = 'auto';
+      this.musicElement.load();
     }
 
-    // ── Layer 3: Distorted bass sequencer — relentless grinding pattern ──
-    // D minor pentatonic: D1=36.7, F1=43.6, G1=49, A1=55, C2=65.4
-    const bassPattern = [55, 55, 55, 0, 43.6, 43.6, 0, 49, 55, 55, 0, 36.7, 36.7, 55, 49, 0];
-    const stepTime = 0.19; // ~158 BPM 16ths — faster, more aggressive
-    const loopLen = bassPattern.length * stepTime;
+    if (!this.musicSource) {
+      this.musicSource = ctx.createMediaElementSource(this.musicElement);
+      this.musicSource.connect(this.musicGainNode);
+    }
 
-    const scheduleBass = () => {
-      if (!this.musicPlaying || !ctx || !this.musicGainNode) return;
-      const now = ctx.currentTime;
-
-      for (let i = 0; i < bassPattern.length; i++) {
-        const freq = bassPattern[i];
-        if (freq === 0) continue;
-        const t = now + i * stepTime;
-
-        // Primary — heavy distorted saw
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        const dist = mkDist(12);
-        const filter = ctx.createBiquadFilter();
-        filter.type = 'lowpass';
-        filter.frequency.value = 500;
-        filter.Q.value = 6;
-        osc.type = 'sawtooth';
-        osc.frequency.setValueAtTime(freq, t);
-        gain.gain.setValueAtTime(0, t);
-        gain.gain.linearRampToValueAtTime(0.35, t + 0.008);
-        gain.gain.setValueAtTime(0.28, t + stepTime * 0.4);
-        gain.gain.exponentialRampToValueAtTime(0.001, t + stepTime * 0.85);
-        osc.connect(dist);
-        dist.connect(filter);
-        filter.connect(gain);
-        gain.connect(this.musicGainNode);
-        osc.start(t);
-        osc.stop(t + stepTime);
-
-        // Sub layer — sine one octave down for chest punch
-        const sub = ctx.createOscillator();
-        const subG = ctx.createGain();
-        sub.type = 'sine';
-        sub.frequency.setValueAtTime(freq / 2, t);
-        subG.gain.setValueAtTime(0, t);
-        subG.gain.linearRampToValueAtTime(0.3, t + 0.005);
-        subG.gain.exponentialRampToValueAtTime(0.001, t + stepTime * 0.7);
-        sub.connect(subG);
-        subG.connect(this.musicGainNode);
-        sub.start(t);
-        sub.stop(t + stepTime);
+    const tryPlay = () => this.musicElement?.play().catch(() => {});
+    tryPlay();
+    // Re-attempt on next gesture if autoplay was blocked
+    const retry = () => {
+      if (this.musicElement?.paused && this.musicPlaying) tryPlay();
+      else {
+        document.removeEventListener('click', retry);
+        document.removeEventListener('touchstart', retry);
       }
-
-      this.musicTimers.push(window.setTimeout(scheduleBass, loopLen * 1000 - 50) as unknown as number);
     };
-    scheduleBass();
-
-    // ── Layer 4: Industrial percussion — pounding, mechanical ──
-    const kickPattern =  [1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 1]; // relentless
-    const snarePattern = [0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 1, 0, 1, 0];
-    const hatPattern =   [1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 0, 1]; // syncopated
-
-    const schedulePerc = () => {
-      if (!this.musicPlaying || !ctx || !this.musicGainNode) return;
-      const now = ctx.currentTime;
-
-      for (let i = 0; i < 16; i++) {
-        const t = now + i * stepTime;
-
-        // Kick — massive distorted sub punch
-        if (kickPattern[i]) {
-          const kick = ctx.createOscillator();
-          const kGain = ctx.createGain();
-          const kDist = mkDist(4);
-          kick.type = 'sine';
-          kick.frequency.setValueAtTime(100, t);
-          kick.frequency.exponentialRampToValueAtTime(25, t + 0.18);
-          kGain.gain.setValueAtTime(0.6, t);
-          kGain.gain.exponentialRampToValueAtTime(0.001, t + 0.18);
-          kick.connect(kDist);
-          kDist.connect(kGain);
-          kGain.connect(this.musicGainNode!);
-          kick.start(t);
-          kick.stop(t + 0.18);
-
-          // Kick transient click
-          const click = ctx.createOscillator();
-          const clickG = ctx.createGain();
-          click.type = 'square';
-          click.frequency.setValueAtTime(800, t);
-          click.frequency.exponentialRampToValueAtTime(200, t + 0.01);
-          clickG.gain.setValueAtTime(0.15, t);
-          clickG.gain.exponentialRampToValueAtTime(0.001, t + 0.015);
-          click.connect(clickG);
-          clickG.connect(this.musicGainNode!);
-          click.start(t);
-          click.stop(t + 0.02);
-        }
-
-        // Snare — industrial metal clang
-        if (snarePattern[i]) {
-          const sLen = ctx.sampleRate * 0.15;
-          const sBuf = ctx.createBuffer(1, sLen, ctx.sampleRate);
-          const sData = sBuf.getChannelData(0);
-          for (let j = 0; j < sLen; j++) { sData[j] = (Math.random() * 2 - 1) * Math.pow(1 - j / sLen, 1.5); }
-          const snare = ctx.createBufferSource();
-          snare.buffer = sBuf;
-          const sDist = mkDist(6);
-          const sFilter = ctx.createBiquadFilter();
-          sFilter.type = 'bandpass';
-          sFilter.frequency.value = 1200;
-          sFilter.Q.value = 2;
-          const sGain = ctx.createGain();
-          sGain.gain.setValueAtTime(0.35, t);
-          sGain.gain.exponentialRampToValueAtTime(0.001, t + 0.15);
-          snare.connect(sDist);
-          sDist.connect(sFilter);
-          sFilter.connect(sGain);
-          sGain.connect(this.musicGainNode!);
-          snare.start(t);
-        }
-
-        // Hi-hat — aggressive filtered noise
-        if (hatPattern[i]) {
-          const hLen = ctx.sampleRate * 0.04;
-          const hBuf = ctx.createBuffer(1, hLen, ctx.sampleRate);
-          const hData = hBuf.getChannelData(0);
-          for (let j = 0; j < hLen; j++) { hData[j] = (Math.random() * 2 - 1) * Math.pow(1 - j / hLen, 3); }
-          const hat = ctx.createBufferSource();
-          hat.buffer = hBuf;
-          const hFilter = ctx.createBiquadFilter();
-          hFilter.type = 'highpass';
-          hFilter.frequency.value = 4000;
-          const hGain = ctx.createGain();
-          hGain.gain.setValueAtTime(0.12, t);
-          hGain.gain.exponentialRampToValueAtTime(0.001, t + 0.04);
-          hat.connect(hFilter);
-          hFilter.connect(hGain);
-          hGain.connect(this.musicGainNode!);
-          hat.start(t);
-        }
-      }
-
-      this.musicTimers.push(window.setTimeout(schedulePerc, loopLen * 1000 - 50) as unknown as number);
-    };
-    schedulePerc();
-
-    // ── Layer 5: Grinding noise texture — constant filtered distorted noise ──
-    const noiseLen = ctx.sampleRate * 4;
-    const noiseBuf = ctx.createBuffer(1, noiseLen, ctx.sampleRate);
-    const noiseData = noiseBuf.getChannelData(0);
-    for (let i = 0; i < noiseLen; i++) { noiseData[i] = Math.random() * 2 - 1; }
-    const noise = ctx.createBufferSource();
-    noise.buffer = noiseBuf;
-    noise.loop = true;
-    const noiseDist = mkDist(6);
-    const noiseFilter = ctx.createBiquadFilter();
-    noiseFilter.type = 'bandpass';
-    noiseFilter.frequency.value = 600;
-    noiseFilter.Q.value = 3;
-    const noiseGain = ctx.createGain();
-    noiseGain.gain.value = 0.06;
-    noise.connect(noiseDist);
-    noiseDist.connect(noiseFilter);
-    noiseFilter.connect(noiseGain);
-    noiseGain.connect(this.musicGainNode);
-    noise.start();
-    this.musicNodes.push(noise as unknown as OscillatorNode);
-
-    // ── Layer 6: Metallic screech — high resonant feedback ──
-    const metalOsc = ctx.createOscillator();
-    const metalGain = ctx.createGain();
-    const metalDist = mkDist(10);
-    const metalFilter = ctx.createBiquadFilter();
-    metalFilter.type = 'bandpass';
-    metalFilter.frequency.value = 1800;
-    metalFilter.Q.value = 20;
-    metalOsc.type = 'sawtooth';
-    metalOsc.frequency.value = 110;
-    metalGain.gain.value = 0.03;
-    metalOsc.connect(metalDist);
-    metalDist.connect(metalFilter);
-    metalFilter.connect(metalGain);
-    metalGain.connect(this.musicGainNode);
-    metalOsc.start();
-    this.musicNodes.push(metalOsc);
+    document.addEventListener('click', retry, { passive: true });
+    document.addEventListener('touchstart', retry, { passive: true });
   }
 
   isMusicPlaying(): boolean {
@@ -666,24 +466,20 @@ export class SoundSystem {
 
   stopMusic(): void {
     this.musicPlaying = false;
-    for (const timer of this.musicTimers) clearTimeout(timer);
-    this.musicTimers = [];
     if (this.musicGainNode && this.ctx) {
       const now = this.ctx.currentTime;
       this.musicGainNode.gain.setValueAtTime(this.musicGainNode.gain.value, now);
       this.musicGainNode.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
     }
-    const nodes = this.musicNodes;
-    this.musicNodes = [];
-    setTimeout(() => {
-      for (const n of nodes) { try { n.stop(); } catch {} }
-    }, 600);
+    const el = this.musicElement;
+    setTimeout(() => { try { el?.pause(); } catch {} }, 600);
   }
 
   setMusicIntensity(intensity: number): void {
     this.musicIntensity = Math.max(0, Math.min(1, intensity));
     if (!this.musicGainNode || !this.ctx) return;
-    const targetGain = 0.1 + this.musicIntensity * 0.25;
+    // +40% over previous 0.1 + 0.25*intensity → range 0.14–0.49
+    const targetGain = 0.14 + this.musicIntensity * 0.35;
     const now = this.ctx.currentTime;
     this.musicGainNode.gain.setValueAtTime(this.musicGainNode.gain.value, now);
     this.musicGainNode.gain.linearRampToValueAtTime(targetGain, now + 0.5);

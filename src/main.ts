@@ -471,7 +471,6 @@ function startMarsLaunch(): void {
     globalSound = SoundSystem.getInstance();
     globalSound.init();
   }
-  globalSound.stopMusic(); // silence music so engine roar is clear
   marsLaunch = createMarsLaunch(bundle.scene, bundle.camera);
 }
 
