@@ -21,7 +21,7 @@ export interface DifficultyConfig {
 }
 
 export const DIFFICULTY: Record<DifficultyLevel, DifficultyConfig> = {
-  // BEGINNER — +33% aggression vs. previous baseline
+  // BEGINNER — fires +80% more frequently (cooldown 677 → 376)
   beginner: {
     label: 'BEGINNER',
     playerHull: 400,
@@ -30,7 +30,7 @@ export const DIFFICULTY: Record<DifficultyLevel, DifficultyConfig> = {
     enemyShield: 0,
     enemySpeedMult: 1.62,
     enemyRotationMult: 1.20,
-    enemyFireRate: 677,
+    enemyFireRate: 376,
     enemyChaseRange: 665,
     aiSensitivity: 2.66,
     aiAggression: 0.27,
@@ -38,7 +38,7 @@ export const DIFFICULTY: Record<DifficultyLevel, DifficultyConfig> = {
     aiLeashRange: 226,
     aiFireCone: 0.34,
   },
-  // INTERMEDIATE — +50% aggression vs. previous baseline
+  // INTERMEDIATE — fires +140% more frequently (cooldown 333 → 139)
   intermediate: {
     label: 'INTERMEDIATE',
     playerHull: 280,
@@ -47,7 +47,7 @@ export const DIFFICULTY: Record<DifficultyLevel, DifficultyConfig> = {
     enemyShield: 10,
     enemySpeedMult: 1.78,
     enemyRotationMult: 1.58,
-    enemyFireRate: 333,
+    enemyFireRate: 139,
     enemyChaseRange: 1050,
     aiSensitivity: 6.75,
     aiAggression: 0.9,
@@ -55,7 +55,7 @@ export const DIFFICULTY: Record<DifficultyLevel, DifficultyConfig> = {
     aiLeashRange: 147,
     aiFireCone: 0.17,
   },
-  // EXPERT — +80% aggression vs. previous baseline (caps at 1.0 for aggression/jink)
+  // EXPERT — fires +220% more frequently (cooldown 139 → 43)
   expert: {
     label: 'EXPERT',
     playerHull: 180,
@@ -64,7 +64,7 @@ export const DIFFICULTY: Record<DifficultyLevel, DifficultyConfig> = {
     enemyShield: 25,
     enemySpeedMult: 2.42,
     enemyRotationMult: 2.79,
-    enemyFireRate: 139,
+    enemyFireRate: 43,
     enemyChaseRange: 1620,
     aiSensitivity: 11.7,
     aiAggression: 1.0,

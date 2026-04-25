@@ -587,7 +587,7 @@ function showHighScoreOverlay(): void {
   const submitBtn = document.createElement('button');
   submitBtn.textContent = 'SAVE SCORE';
   submitBtn.className = 'overlay-btn';
-  submitBtn.style.cssText = 'margin-top:16px;width:auto;padding:12px 32px;border-color:var(--gold);color:var(--gold);text-align:center;display:block;margin-left:auto;margin-right:auto;';
+  submitBtn.style.cssText = 'margin-top:16px;width:auto;padding:12px 32px;border-color:var(--gold);color:var(--gold);margin-left:auto;margin-right:auto;';
   submitBtn.addEventListener('click', submitScore);
   panel.appendChild(submitBtn);
 

@@ -28,6 +28,7 @@ export const WEAPONS = {
   BLASTER_DAMAGE: 10,  // enemies die in ~5-8 hits depending on difficulty
   BLASTER_BOLT_LIFETIME: 2000,
   BLASTER_SPREAD: 0.5,  // near-pinpoint accuracy when locked
+  LOCK_RANGE: 250,  // max distance (m) at which a target can be locked
 } as const;
 
 export const SHIP = {

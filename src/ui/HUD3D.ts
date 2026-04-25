@@ -6,6 +6,7 @@
 import * as THREE from 'three';
 import { Ship3D } from '../entities/Ship3D';
 import { currentCharacter } from '../state/Character';
+import { WEAPONS } from '../config';
 
 /** Villain names — mapped by enemy index across all levels. */
 const ENEMY_NAMES = ['BOLO TIE', 'BOW TIE', 'BISHOP'];
@@ -802,6 +803,11 @@ export class HUD3D {
 
     const enemy = enemies[lockedTargetIndex];
     if (!enemy.alive) {
+      this.hideLock();
+      return;
+    }
+    // Out of lock range — invalidate the lock visually
+    if (enemy.position.distanceTo(player.position) > WEAPONS.LOCK_RANGE) {
       this.hideLock();
       return;
     }

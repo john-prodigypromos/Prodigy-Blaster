@@ -23,6 +23,7 @@ export function tryFireWeapon(
   now: number,
   fireRate?: number,
   target?: Ship3D,
+  damageMultiplier = 1,
 ): boolean {
   const rate = fireRate ?? WEAPONS.BLASTER_FIRE_RATE;
   if (now - ship.lastFireTime < rate) return false;
@@ -62,7 +63,10 @@ export function tryFireWeapon(
     _dir.y += (Math.random() - 0.5) * spreadRad;
     _dir.normalize();
 
-    pool.fire(spawnPos, _dir, ship.isPlayer);
+    const bolt = pool.fire(spawnPos, _dir, ship.isPlayer);
+    if (bolt && damageMultiplier !== 1) {
+      bolt.damage *= damageMultiplier;
+    }
   }
 
   return true;
