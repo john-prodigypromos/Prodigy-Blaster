@@ -178,7 +178,7 @@ function createOverlayPanel(cssClass = 'game-overlay'): HTMLDivElement {
 }
 
 function showTitleOverlay(): void {
-  const panel = createOverlayPanel();
+  const panel = createOverlayPanel('game-overlay title-screen');
 
   // Prodigy logo — large and prominent
   const logo = document.createElement('img');
