@@ -190,6 +190,10 @@
       margin-top: 5px;
       letter-spacing: 0.5px;
     }
+    /* Desktop only — left-align wrapped description text inside difficulty buttons */
+    @media (min-width: 601px) {
+      .game-overlay .btn-desc { text-align: left; }
+    }
 
     /* ── Character Cards ── */
     .game-overlay .char-card {
