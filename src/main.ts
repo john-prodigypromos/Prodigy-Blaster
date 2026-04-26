@@ -313,9 +313,9 @@ function showCharSelectOverlay(): void {
 
 // Villain intro data — portrait, name, and taunt per level
 const VILLAIN_INTROS = [
-  { name: 'BOLO TIE', portrait: 'bolo-tie.jpg', taunt: 'Wo unto the liar...' },
-  { name: 'BOW TIE', portrait: 'bow-tie.jpg', taunt: 'Are you a thug nasty?' },
-  { name: 'BISHOP', portrait: 'bishop.jpg', taunt: 'I find you deplorable!' },
+  { name: 'BOLO TIE', portrait: 'bolo-tie2.jpg', taunt: 'Wo unto the liar...' },
+  { name: 'BOW TIE', portrait: 'bow-tie2.jpg', taunt: 'Are you a thug nasty?' },
+  { name: 'BISHOP', portrait: 'bishop2.jpg', taunt: 'I find you deplorable!' },
 ];
 
 function showLevelIntroOverlay(): void {
@@ -598,7 +598,7 @@ function showGameOverOverlay(): void {
   const panel = createOverlayPanel();
 
   // Villain portrait — show the enemy from the current level
-  const enemyPortraits = ['bolo-tie.jpg', 'bow-tie.jpg', 'bishop.jpg'];
+  const enemyPortraits = ['bolo-tie2.jpg', 'bow-tie2.jpg', 'bishop2.jpg'];
   const villainFile = enemyPortraits[Math.min(currentLevelIndex, enemyPortraits.length - 1)];
   const villainImg = document.createElement('img');
   villainImg.src = `/portraits/${villainFile}`;

@@ -28,7 +28,7 @@ export const DIFFICULTY: Record<DifficultyLevel, DifficultyConfig> = {
     playerShield: 200,
     enemyHull: 200,
     enemyShield: 0,
-    enemySpeedMult: 1.62,
+    enemySpeedMult: 1.0,  // match player speed so thrust closes gap on EASY
     enemyRotationMult: 1.20,
     enemyFireRate: 376,
     enemyChaseRange: 665,
@@ -45,7 +45,7 @@ export const DIFFICULTY: Record<DifficultyLevel, DifficultyConfig> = {
     playerShield: 140,
     enemyHull: 350,
     enemyShield: 10,
-    enemySpeedMult: 1.78,
+    enemySpeedMult: 1.10,  // 10% faster — player still catches with effort
     enemyRotationMult: 1.58,
     enemyFireRate: 139,
     enemyChaseRange: 1050,
@@ -62,7 +62,7 @@ export const DIFFICULTY: Record<DifficultyLevel, DifficultyConfig> = {
     playerShield: 90,
     enemyHull: 550,
     enemyShield: 25,
-    enemySpeedMult: 2.42,
+    enemySpeedMult: 1.20,  // 20% faster — chase requires positioning, not impossible
     enemyRotationMult: 2.79,
     enemyFireRate: 43,
     enemyChaseRange: 1620,

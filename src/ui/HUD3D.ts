@@ -12,7 +12,7 @@ import { WEAPONS } from '../config';
 const ENEMY_NAMES = ['BOLO TIE', 'BOW TIE', 'BISHOP'];
 
 /** Villain portrait filenames in public/portraits/ — mapped by enemy index. */
-const ENEMY_PORTRAITS = ['bolo-tie.jpg', 'bow-tie.jpg', 'bishop.jpg'];
+const ENEMY_PORTRAITS = ['bolo-tie2.jpg', 'bow-tie2.jpg', 'bishop2.jpg'];
 
 function el(tag: string, attrs: Record<string, string> = {}, text?: string): HTMLElement {
   const e = document.createElement(tag);
@@ -642,6 +642,21 @@ export class HUD3D {
         portrait = document.createElement('img');
         portrait.src = `/portraits/${portraitFile}?v=3`;
         portrait.style.cssText = 'object-fit:cover;border-radius:50%;display:none;margin:2px auto 0;';
+        // Fallback: if portrait fails to load, render a flat colored disc with the
+        // first letter of the villain name so the slot isn't an empty circle.
+        portrait.onerror = () => {
+          const initial = (ENEMY_NAMES[idx] ?? '?')[0];
+          portrait!.style.background = '#3a1818';
+          portrait!.style.color = '#ff8866';
+          portrait!.style.display = 'flex';
+          portrait!.style.alignItems = 'center';
+          portrait!.style.justifyContent = 'center';
+          portrait!.style.fontFamily = 'var(--font-display)';
+          portrait!.style.fontWeight = '900';
+          portrait!.style.fontSize = '32px';
+          portrait!.alt = initial;
+          portrait!.removeAttribute('src');
+        };
         outer.appendChild(portrait);
       }
 

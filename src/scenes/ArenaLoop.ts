@@ -512,7 +512,7 @@ export function updateArena(
 
           // ── Enemy kill portrait flash + sustained explosion ──
           const killIdx = enemies.indexOf(evt.target);
-          const killPortraitFiles = ['bolo-tie.jpg', 'bow-tie.jpg', 'bishop.jpg'];
+          const killPortraitFiles = ['bolo-tie2.jpg', 'bow-tie2.jpg', 'bishop2.jpg'];
           const killFile = killPortraitFiles[killIdx];
           if (killFile) {
             const killOverlay = document.createElement('div');
