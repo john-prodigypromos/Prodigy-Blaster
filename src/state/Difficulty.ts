@@ -9,6 +9,7 @@ export interface DifficultyConfig {
   enemyHull: number;
   enemyShield: number;
   enemySpeedMult: number;
+  enemyAccelMult: number;    // thrust multiplier — independent of top speed
   enemyRotationMult: number;
   enemyFireRate: number;
   enemyChaseRange: number;
@@ -21,14 +22,15 @@ export interface DifficultyConfig {
 }
 
 export const DIFFICULTY: Record<DifficultyLevel, DifficultyConfig> = {
-  // BEGINNER — fires +80% more frequently (cooldown 677 → 376)
+  // BEGINNER — fire rate unchanged; accel cut 50% (lazier acceleration)
   beginner: {
     label: 'BEGINNER',
     playerHull: 400,
     playerShield: 200,
     enemyHull: 200,
     enemyShield: 0,
-    enemySpeedMult: 1.0,  // match player speed so thrust closes gap on EASY
+    enemySpeedMult: 1.0,  // top speed matches player
+    enemyAccelMult: 0.5,  // thrust halved — slower to wind up
     enemyRotationMult: 1.20,
     enemyFireRate: 376,
     enemyChaseRange: 665,
@@ -38,16 +40,17 @@ export const DIFFICULTY: Record<DifficultyLevel, DifficultyConfig> = {
     aiLeashRange: 226,
     aiFireCone: 0.34,
   },
-  // INTERMEDIATE — fires +140% more frequently (cooldown 333 → 139)
+  // INTERMEDIATE — fire rate +30% more frequent; accel -20%
   intermediate: {
     label: 'INTERMEDIATE',
     playerHull: 280,
     playerShield: 140,
     enemyHull: 350,
     enemyShield: 10,
-    enemySpeedMult: 1.10,  // 10% faster — player still catches with effort
+    enemySpeedMult: 1.10,
+    enemyAccelMult: 0.8,  // thrust 80% — slightly less snappy
     enemyRotationMult: 1.58,
-    enemyFireRate: 139,
+    enemyFireRate: 107,   // 139 / 1.3 — fires 30% more often
     enemyChaseRange: 1050,
     aiSensitivity: 6.75,
     aiAggression: 0.9,
@@ -55,16 +58,17 @@ export const DIFFICULTY: Record<DifficultyLevel, DifficultyConfig> = {
     aiLeashRange: 147,
     aiFireCone: 0.17,
   },
-  // EXPERT — fires +220% more frequently (cooldown 139 → 43)
+  // EXPERT — fire rate +70% more frequent; accel unchanged
   expert: {
     label: 'EXPERT',
     playerHull: 180,
     playerShield: 90,
     enemyHull: 550,
     enemyShield: 25,
-    enemySpeedMult: 1.20,  // 20% faster — chase requires positioning, not impossible
+    enemySpeedMult: 1.20,
+    enemyAccelMult: 1.0,  // full thrust — snap-to-attack
     enemyRotationMult: 2.79,
-    enemyFireRate: 43,
+    enemyFireRate: 25,    // 43 / 1.7 — fires 70% more often
     enemyChaseRange: 1620,
     aiSensitivity: 11.7,
     aiAggression: 1.0,

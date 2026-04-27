@@ -12,6 +12,9 @@ export interface Ship3DConfig {
   speedMult: number;
   rotationMult: number;
   isPlayer: boolean;
+  /** Multiplier applied to thrust force only — independent of speedMult so a
+   *  ship can keep its top speed but accelerate more lazily. Defaults to 1.0. */
+  accelMult?: number;
 }
 
 export class Ship3D {
@@ -22,6 +25,7 @@ export class Ship3D {
   maxShield: number;
   speedMult: number;
   rotationMult: number;
+  accelMult: number;
   isPlayer: boolean;
   alive = true;
 
@@ -42,6 +46,7 @@ export class Ship3D {
     this.maxShield = config.maxShield;
     this.speedMult = config.speedMult;
     this.rotationMult = config.rotationMult;
+    this.accelMult = config.accelMult ?? 1.0;
     this.isPlayer = config.isPlayer;
   }
 

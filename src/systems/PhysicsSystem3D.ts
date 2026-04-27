@@ -63,7 +63,7 @@ export function applyShipPhysics(ship: Ship3D, input: ShipInput, dt: number, now
   // ── Thrust ──
   if (input.thrust !== 0) {
     const forward = ship.getForward();
-    const thrustForce = PHYSICS.THRUST * ship.speedMult * input.thrust;
+    const thrustForce = PHYSICS.THRUST * ship.speedMult * ship.accelMult * input.thrust;
     ship.velocity.addScaledVector(forward, thrustForce * dt);
   }
 
