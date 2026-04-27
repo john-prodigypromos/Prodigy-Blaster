@@ -55,6 +55,9 @@ function releaseDamageOverlay(el: HTMLDivElement, delayMs: number): void {
 
 // ── Player-death visuals: fullscreen fire flash + screen-spread explosions ──
 // Used when the player is killed by an enemy bolt OR crashes into a celestial body.
+// The fire flash starts as a tiny circle at screen center, expands outward to
+// envelope the entire screen, then freezes there. Cleanup is handled when the
+// scene transitions out (clearOverlay() removes any element with .death-fx).
 function spawnPlayerDeathFireFlash(overlay: HTMLElement): void {
   const fireFlash = document.createElement('div');
   fireFlash.className = 'death-fx';
@@ -64,10 +67,19 @@ function spawnPlayerDeathFireFlash(overlay: HTMLElement): void {
     'radial-gradient(ellipse at 30% 35%, rgba(255,240,160,0.55) 0%, rgba(255,140,40,0) 42%),' +
     'radial-gradient(ellipse at 70% 60%, rgba(255,200,80,0.55) 0%, rgba(255,100,20,0) 45%),' +
     'radial-gradient(ellipse at 50% 50%, rgba(255,255,210,0.95) 0%, rgba(255,210,70,0.92) 14%, rgba(255,140,40,0.88) 30%, rgba(255,70,20,0.78) 55%, rgba(160,30,10,0.65) 80%, rgba(40,8,0,0.5) 100%);' +
-    'z-index:50;pointer-events:none;opacity:1;transition:opacity 2.5s ease-out;';
+    'z-index:50;pointer-events:none;opacity:1;' +
+    'clip-path:circle(0% at 50% 50%);-webkit-clip-path:circle(0% at 50% 50%);';
   overlay.appendChild(fireFlash);
-  requestAnimationFrame(() => { fireFlash.style.opacity = '0'; });
-  setTimeout(() => fireFlash.remove(), 2700);
+  // Expand the fire from center to fully envelope the screen (150% reaches
+  // every corner), then lock that final state. fill:'forwards' freezes the
+  // expanded clip — the overlay persists until scene cleanup.
+  fireFlash.animate(
+    [
+      { clipPath: 'circle(0% at 50% 50%)', WebkitClipPath: 'circle(0% at 50% 50%)' } as Keyframe,
+      { clipPath: 'circle(150% at 50% 50%)', WebkitClipPath: 'circle(150% at 50% 50%)' } as Keyframe,
+    ],
+    { duration: 750, easing: 'ease-out', fill: 'forwards' },
+  );
 }
 
 function spawnPlayerDeathScreenExplosions(explosions: ExplosionPool): void {
@@ -202,6 +214,7 @@ export function createArenaState(
       maxHull: Math.round(diff.enemyHull * levelConfig.enemySpeedBonus * hpMult),
       maxShield: diff.enemyShield * (isBoss ? 1.5 : 1),
       speedMult: diff.enemySpeedMult * levelConfig.enemySpeedBonus,
+      accelMult: diff.enemyAccelMult,
       rotationMult: diff.enemyRotationMult * levelConfig.enemyRotationBonus,
       isPlayer: false,
     });
