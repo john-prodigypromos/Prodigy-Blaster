@@ -619,7 +619,10 @@ export class HUD3D {
   private enemySlots: {
     outer: HTMLDivElement;
     arrow: HTMLDivElement;
-    portrait: HTMLImageElement | null;
+    /** Wrapper div with letter fallback baked in; <img> overlays inside it.
+     *  Using a div (not the img directly) guarantees a visible avatar even if
+     *  the image fails to load or hasn't decoded yet. */
+    portrait: HTMLDivElement | null;
     barBg: HTMLDivElement;
     barFill: HTMLDivElement;
     label: HTMLDivElement;
@@ -636,27 +639,29 @@ export class HUD3D {
       arrow.style.cssText = 'width:0;height:0;border-left:10px solid transparent;border-right:10px solid transparent;border-bottom:18px solid #ff4444;filter:drop-shadow(0 0 4px rgba(255,0,0,0.6));margin:0 auto;display:none;';
       outer.appendChild(arrow);
 
-      let portrait: HTMLImageElement | null = null;
+      let portrait: HTMLDivElement | null = null;
       const portraitFile = ENEMY_PORTRAITS[idx];
       if (portraitFile) {
-        portrait = document.createElement('img');
-        portrait.src = `/portraits/${portraitFile}?v=3`;
-        portrait.style.cssText = 'object-fit:cover;border-radius:50%;display:none;margin:2px auto 0;';
-        // Fallback: if portrait fails to load, render a flat colored disc with the
-        // first letter of the villain name so the slot isn't an empty circle.
-        portrait.onerror = () => {
-          const initial = (ENEMY_NAMES[idx] ?? '?')[0];
-          portrait!.style.background = '#3a1818';
-          portrait!.style.color = '#ff8866';
-          portrait!.style.display = 'flex';
-          portrait!.style.alignItems = 'center';
-          portrait!.style.justifyContent = 'center';
-          portrait!.style.fontFamily = 'var(--font-display)';
-          portrait!.style.fontWeight = '900';
-          portrait!.style.fontSize = '32px';
-          portrait!.alt = initial;
-          portrait!.removeAttribute('src');
-        };
+        // Wrapper has a dark-red disc + the villain's initial letter as a
+        // guaranteed-visible fallback. The <img> overlays inside; if it loads
+        // it covers the letter, if it fails the letter remains visible.
+        const initial = (ENEMY_NAMES[idx] ?? '?')[0];
+        portrait = document.createElement('div');
+        portrait.textContent = initial;
+        portrait.style.cssText =
+          'position:relative;margin:2px auto 0;border-radius:50%;overflow:hidden;' +
+          'background:#3a1818;color:#ffd0a0;' +
+          'font-family:var(--font-display);font-weight:900;font-size:32px;' +
+          'align-items:center;justify-content:center;display:none;';
+        const img = document.createElement('img');
+        img.src = `/portraits/${portraitFile}?v=4`;
+        img.alt = initial;
+        img.loading = 'eager';
+        img.style.cssText =
+          'position:absolute;top:0;left:0;width:100%;height:100%;' +
+          'object-fit:cover;border-radius:50%;';
+        img.onerror = () => { img.style.display = 'none'; };
+        portrait.appendChild(img);
         outer.appendChild(portrait);
       }
 
@@ -738,7 +743,7 @@ export class HUD3D {
         slot.arrow.style.borderBottomColor = '#ff4444';
 
         if (slot.portrait) {
-          slot.portrait.style.display = 'block';
+          slot.portrait.style.display = 'flex';
           slot.portrait.style.width = '75px';
           slot.portrait.style.height = '75px';
           slot.portrait.style.border = '2px solid #ff4444';
@@ -782,11 +787,13 @@ export class HUD3D {
       const portraitSize = Math.round(106 * distScale);
       const dropShadowPx = Math.round(10 * distScale);
       if (slot.portrait) {
-        slot.portrait.style.display = 'block';
+        slot.portrait.style.display = 'flex';
         slot.portrait.style.width = portraitSize + 'px';
         slot.portrait.style.height = portraitSize + 'px';
         slot.portrait.style.border = `2px solid ${borderColor}`;
         slot.portrait.style.filter = `drop-shadow(0 0 ${dropShadowPx}px ${glowColor})`;
+        // Scale fallback initial-letter font with portrait size
+        slot.portrait.style.fontSize = Math.max(16, Math.round(portraitSize * 0.42)) + 'px';
       }
 
       if (showDetails) {
@@ -831,7 +838,7 @@ export class HUD3D {
       return;
     }
     // Out of lock range — invalidate the lock visually
-    if (enemy.position.distanceTo(player.position) > WEAPONS.LOCK_RANGE) {
+    if (enemy.position.distanceTo(player.position) > WEAPONS.PLAYER_LOCK_RANGE) {
       this.hideLock();
       return;
     }
@@ -868,7 +875,7 @@ export class HUD3D {
       // Update portrait src if enemy changed
       const portraitFile = ENEMY_PORTRAITS[lockedTargetIndex];
       if (this.lockedEnemyIdx !== lockedTargetIndex && portraitFile) {
-        this.lockPortrait.src = `/portraits/${portraitFile}?v=3`;
+        this.lockPortrait.src = `/portraits/${portraitFile}?v=4`;
         this.lockedEnemyIdx = lockedTargetIndex;
       }
 
