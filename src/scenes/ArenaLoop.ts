@@ -215,6 +215,7 @@ export function createArenaState(
       maxShield: diff.enemyShield * (isBoss ? 1.5 : 1),
       speedMult: diff.enemySpeedMult * levelConfig.enemySpeedBonus,
       accelMult: diff.enemyAccelMult,
+      dragMult: diff.enemyDragMult,
       rotationMult: diff.enemyRotationMult * levelConfig.enemyRotationBonus,
       isPlayer: false,
     });

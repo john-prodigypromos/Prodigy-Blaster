@@ -10,6 +10,7 @@ export interface DifficultyConfig {
   enemyShield: number;
   enemySpeedMult: number;
   enemyAccelMult: number;    // thrust multiplier — independent of top speed
+  enemyDragMult: number;     // drag multiplier — <1 = floatier, can't brake hard
   enemyRotationMult: number;
   enemyFireRate: number;
   enemyChaseRange: number;
@@ -22,25 +23,26 @@ export interface DifficultyConfig {
 }
 
 export const DIFFICULTY: Record<DifficultyLevel, DifficultyConfig> = {
-  // BEGINNER — fire rate unchanged; accel cut 50% (lazier acceleration)
+  // BEGINNER — accel & decel both cut further; bumped fire/aggression for closer engagement
   beginner: {
     label: 'BEGINNER',
     playerHull: 400,
     playerShield: 200,
     enemyHull: 200,
     enemyShield: 0,
-    enemySpeedMult: 1.0,  // top speed matches player
-    enemyAccelMult: 0.5,  // thrust halved — slower to wind up
+    enemySpeedMult: 1.0,
+    enemyAccelMult: 0.35,  // thrust 35% — winds up much more slowly
+    enemyDragMult: 0.5,    // drag halved — coasts more, can't brake on a dime
     enemyRotationMult: 1.20,
-    enemyFireRate: 376,
-    enemyChaseRange: 665,
+    enemyFireRate: 280,    // ~30% more frequent than 376
+    enemyChaseRange: 1000, // pursues the player further
     aiSensitivity: 2.66,
-    aiAggression: 0.27,
+    aiAggression: 0.5,     // ↑ from 0.27 — more relentless pursuit
     aiJinkIntensity: 0.20,
-    aiLeashRange: 226,
-    aiFireCone: 0.34,
+    aiLeashRange: 150,     // ↓ from 226 — engages closer
+    aiFireCone: 0.28,      // wider cone — fires earlier when on target
   },
-  // INTERMEDIATE — fire rate +30% more frequent; accel -20%
+  // INTERMEDIATE — same treatment, scaled for the harder tier
   intermediate: {
     label: 'INTERMEDIATE',
     playerHull: 280,
@@ -48,17 +50,18 @@ export const DIFFICULTY: Record<DifficultyLevel, DifficultyConfig> = {
     enemyHull: 350,
     enemyShield: 10,
     enemySpeedMult: 1.10,
-    enemyAccelMult: 0.8,  // thrust 80% — slightly less snappy
+    enemyAccelMult: 0.55,  // ↓ from 0.8
+    enemyDragMult: 0.65,   // floatier — less braking ability
     enemyRotationMult: 1.58,
-    enemyFireRate: 107,   // 139 / 1.3 — fires 30% more often
-    enemyChaseRange: 1050,
+    enemyFireRate: 80,     // ~30% more frequent than 107
+    enemyChaseRange: 1400,
     aiSensitivity: 6.75,
-    aiAggression: 0.9,
+    aiAggression: 1.0,     // maxed — full pursuit
     aiJinkIntensity: 0.83,
-    aiLeashRange: 147,
-    aiFireCone: 0.17,
+    aiLeashRange: 100,     // ↓ from 147
+    aiFireCone: 0.13,
   },
-  // EXPERT — fire rate +70% more frequent; accel unchanged
+  // EXPERT — accel/decel still cut (user said all difficulty levels)
   expert: {
     label: 'EXPERT',
     playerHull: 180,
@@ -66,15 +69,16 @@ export const DIFFICULTY: Record<DifficultyLevel, DifficultyConfig> = {
     enemyHull: 550,
     enemyShield: 25,
     enemySpeedMult: 1.20,
-    enemyAccelMult: 1.0,  // full thrust — snap-to-attack
+    enemyAccelMult: 0.7,   // ↓ from 1.0
+    enemyDragMult: 0.8,    // slight float — still mostly snappy at top tier
     enemyRotationMult: 2.79,
-    enemyFireRate: 25,    // 43 / 1.7 — fires 70% more often
-    enemyChaseRange: 1620,
+    enemyFireRate: 18,     // ~30% more frequent than 25
+    enemyChaseRange: 2000,
     aiSensitivity: 11.7,
     aiAggression: 1.0,
     aiJinkIntensity: 1.0,
-    aiLeashRange: 89,
-    aiFireCone: 0.056,
+    aiLeashRange: 60,      // ↓ from 89 — tight close-quarters
+    aiFireCone: 0.04,
   },
 };
 

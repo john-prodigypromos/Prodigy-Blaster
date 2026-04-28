@@ -68,7 +68,8 @@ export function applyShipPhysics(ship: Ship3D, input: ShipInput, dt: number, now
   }
 
   // ── Drag (exponential half-life decay) ──
-  const dragFactor = Math.exp(-Math.log(2) / PHYSICS.DRAG_HALF_LIFE * dt);
+  // dragMult < 1 = floatier (longer half-life, ship coasts more)
+  const dragFactor = Math.exp(-Math.log(2) * ship.dragMult / PHYSICS.DRAG_HALF_LIFE * dt);
   ship.velocity.multiplyScalar(dragFactor);
 
   // ── Velocity cap ──

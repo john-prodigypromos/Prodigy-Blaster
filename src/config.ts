@@ -53,7 +53,7 @@ export const AI = {
 
 export const COLORS = {
   player: 0x88aacc,
-  enemy: 0xcc4444,
+  enemy: 0xbfb8af,  // Pantone Warm Gray 3C
   playerBolt: 0x00ddff,
   enemyBolt: 0xff3322,
   pickup: 0xffaa22,

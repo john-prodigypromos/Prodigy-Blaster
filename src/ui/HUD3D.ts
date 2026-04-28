@@ -766,27 +766,33 @@ export class HUD3D {
       const textColor = inLockZone ? '#00ff66' : '#ff4444';
 
       const onScreenDist = Math.round(enemy.position.distanceTo(player.position));
-      const distScale = Math.max(0.3, Math.min(1.0, 60 / Math.max(onScreenDist, 1)));
-      const showDetails = distScale > 0.4;
+      // distScale floors at 0.45 (was 0.3) so distant villain portraits stay
+      // legibly sized — the user wants villain avatars visible at all times.
+      const distScale = Math.max(0.45, Math.min(1.0, 60 / Math.max(onScreenDist, 1)));
+      // HP bar + name label still gate by distance to avoid clutter when far,
+      // but the villain portrait is always shown.
+      const showDetails = distScale > 0.55;
 
       slot.outer.style.left = sx + 'px';
       slot.outer.style.top = sy + 'px';
       slot.arrow.style.display = 'none';
+      slot.marker.style.display = 'none';
+
+      // Always-on villain portrait
+      const portraitSize = Math.round(106 * distScale);
+      const dropShadowPx = Math.round(10 * distScale);
+      if (slot.portrait) {
+        slot.portrait.style.display = 'block';
+        slot.portrait.style.width = portraitSize + 'px';
+        slot.portrait.style.height = portraitSize + 'px';
+        slot.portrait.style.border = `2px solid ${borderColor}`;
+        slot.portrait.style.filter = `drop-shadow(0 0 ${dropShadowPx}px ${glowColor})`;
+      }
 
       if (showDetails) {
-        const portraitSize = Math.round(106 * distScale);
         const barWidth = Math.round(106 * distScale);
         const barH = Math.max(5, Math.round(10 * distScale));
         const fontSize = Math.max(11, Math.round(18 * distScale));
-        const dropShadowPx = Math.round(10 * distScale);
-
-        if (slot.portrait) {
-          slot.portrait.style.display = 'block';
-          slot.portrait.style.width = portraitSize + 'px';
-          slot.portrait.style.height = portraitSize + 'px';
-          slot.portrait.style.border = `2px solid ${borderColor}`;
-          slot.portrait.style.filter = `drop-shadow(0 0 ${dropShadowPx}px ${glowColor})`;
-        }
 
         slot.barBg.style.display = 'block';
         slot.barBg.style.width = barWidth + 'px';
@@ -804,16 +810,10 @@ export class HUD3D {
         slot.label.style.color = textColor;
         slot.label.style.textShadow = `0 0 4px ${glowColor}`;
         slot.label.textContent = `${ENEMY_NAMES[i] ?? `ENEMY ${i + 1}`} [${onScreenDist}m]`;
-
-        slot.marker.style.display = 'none';
       } else {
-        // Tiny distant marker — everything else off
-        if (slot.portrait) slot.portrait.style.display = 'none';
+        // Distant: portrait stays, bar + label hide
         slot.barBg.style.display = 'none';
         slot.label.style.display = 'none';
-        slot.marker.style.display = 'block';
-        slot.marker.style.background = borderColor;
-        slot.marker.style.boxShadow = `0 0 6px ${glowColor}`;
       }
     }
   }

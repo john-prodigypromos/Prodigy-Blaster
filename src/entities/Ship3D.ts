@@ -15,6 +15,9 @@ export interface Ship3DConfig {
   /** Multiplier applied to thrust force only — independent of speedMult so a
    *  ship can keep its top speed but accelerate more lazily. Defaults to 1.0. */
   accelMult?: number;
+  /** Multiplier applied to drag rate. <1 = floatier (longer half-life, less
+   *  deceleration ability). 1.0 = normal. Defaults to 1.0. */
+  dragMult?: number;
 }
 
 export class Ship3D {
@@ -26,6 +29,7 @@ export class Ship3D {
   speedMult: number;
   rotationMult: number;
   accelMult: number;
+  dragMult: number;
   isPlayer: boolean;
   alive = true;
 
@@ -47,6 +51,7 @@ export class Ship3D {
     this.speedMult = config.speedMult;
     this.rotationMult = config.rotationMult;
     this.accelMult = config.accelMult ?? 1.0;
+    this.dragMult = config.dragMult ?? 1.0;
     this.isPlayer = config.isPlayer;
   }
 
