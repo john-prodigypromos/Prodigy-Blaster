@@ -973,7 +973,7 @@ export function createCanyonTerrain(
     roughness: 0.92,
     metalness: 0.02,
   });
-  const marsGeo = new THREE.SphereGeometry(MARS_RADIUS, IS_MOBILE ? 48 : 128, IS_MOBILE ? 32 : 96);
+  const marsGeo = new THREE.SphereGeometry(MARS_RADIUS, IS_MOBILE ? 48 : 218, IS_MOBILE ? 32 : 163);
   const marsSphere = new THREE.Mesh(marsGeo, marsMat);
   marsSphere.position.y = -MARS_RADIUS + config.wallHeight;
   group.add(marsSphere);

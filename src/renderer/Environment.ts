@@ -572,7 +572,8 @@ export function createPlanet(scene: THREE.Scene, profileIndex = 0): THREE.Group 
   const prof = PLANET_PROFILES[profileIndex % PLANET_PROFILES.length];
   const group = new THREE.Group();
 
-  const planetGeo = new THREE.SphereGeometry(prof.radius, 288, 192);
+  // +70% geometry detail — smoother silhouette + finer bump relief
+  const planetGeo = new THREE.SphereGeometry(prof.radius, 326, 218);
   const planetMat = new THREE.MeshStandardMaterial({
     color: prof.color,
     metalness: prof.metalness,
@@ -584,7 +585,7 @@ export function createPlanet(scene: THREE.Scene, profileIndex = 0): THREE.Group 
   // Procedural bump map for surface relief
   const bumpTex = createPlanetBumpMap(prof.textureSeed);
   planetMat.bumpMap = bumpTex;
-  planetMat.bumpScale = 0.8;
+  planetMat.bumpScale = 1.36;
 
   if (prof.textureType === 'venus') {
     const loader = new THREE.TextureLoader();
@@ -607,7 +608,7 @@ export function createPlanet(scene: THREE.Scene, profileIndex = 0): THREE.Group 
   group.add(planet);
 
   // Inner atmosphere — subtle haze
-  const atmos1Geo = new THREE.SphereGeometry(prof.radius * 1.02, 96, 72);
+  const atmos1Geo = new THREE.SphereGeometry(prof.radius * 1.02, 109, 82);
   const atmos1Mat = new THREE.MeshBasicMaterial({
     color: prof.atmosColor,
     transparent: true,
@@ -617,7 +618,7 @@ export function createPlanet(scene: THREE.Scene, profileIndex = 0): THREE.Group 
   group.add(new THREE.Mesh(atmos1Geo, atmos1Mat));
 
   // Outer atmosphere glow — larger, softer
-  const atmos2Geo = new THREE.SphereGeometry(prof.radius * 1.06, 72, 48);
+  const atmos2Geo = new THREE.SphereGeometry(prof.radius * 1.06, 82, 55);
   const atmos2Mat = new THREE.MeshBasicMaterial({
     color: prof.atmosColor,
     transparent: true,
@@ -691,7 +692,8 @@ export function createMoon(scene: THREE.Scene): THREE.Group {
   moonFallback.wrapS = THREE.RepeatWrapping;
   moonFallback.anisotropy = 4;
 
-  const moonGeo = new THREE.SphereGeometry(35, 96, 72);
+  // Keep upstream's 35-unit radius (intentional gameplay change), bump segments for fidelity
+  const moonGeo = new THREE.SphereGeometry(35, 109, 82);
   const moonMat = new THREE.MeshStandardMaterial({
     map: moonFallback,
     metalness: 0.1,

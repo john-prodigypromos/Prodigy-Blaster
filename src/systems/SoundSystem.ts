@@ -195,6 +195,11 @@ export class SoundSystem {
     if (!ctx || !this.masterGain) return;
     const now = ctx.currentTime;
 
+    // Per-explosion bus — trims overall volume 35% (audio is desktop-only)
+    const bus = ctx.createGain();
+    bus.gain.value = 0.65;
+    bus.connect(this.masterGain);
+
     // Layer 1: Initial transient crack — sharp attack, loud noise burst
     const crackSize = ctx.sampleRate * 0.08;
     const crackBuf = ctx.createBuffer(1, crackSize, ctx.sampleRate);
@@ -210,7 +215,7 @@ export class SoundSystem {
     crackGain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
     crack.connect(crackFilter);
     crackFilter.connect(crackGain);
-    crackGain.connect(this.masterGain);
+    crackGain.connect(bus);
     crack.start(now);
 
     // Layer 2: Heavy bass thud — massive "boom" body
@@ -223,7 +228,7 @@ export class SoundSystem {
     subGain.gain.setValueAtTime(0.96, now + 0.05);
     subGain.gain.exponentialRampToValueAtTime(0.001, now + 2.0);
     sub.connect(subGain);
-    subGain.connect(this.masterGain);
+    subGain.connect(bus);
     sub.start(now);
     sub.stop(now + 1.5);
 
@@ -245,7 +250,7 @@ export class SoundSystem {
     rumbleGain.gain.exponentialRampToValueAtTime(0.001, now + 3.0);
     rumble.connect(rumbleFilter);
     rumbleFilter.connect(rumbleGain);
-    rumbleGain.connect(this.masterGain);
+    rumbleGain.connect(bus);
     rumble.start(now);
 
     // Layer 4: Mid-frequency growl — distorted for aggression
@@ -264,7 +269,7 @@ export class SoundSystem {
     mid.connect(midDist);
     midDist.connect(midFilter);
     midFilter.connect(midGain);
-    midGain.connect(this.masterGain);
+    midGain.connect(bus);
     mid.start(now);
     mid.stop(now + 1.0);
 
@@ -278,7 +283,7 @@ export class SoundSystem {
     sub2Gain.gain.linearRampToValueAtTime(0.8, now + 0.1);
     sub2Gain.gain.exponentialRampToValueAtTime(0.001, now + 1.8);
     sub2.connect(sub2Gain);
-    sub2Gain.connect(this.masterGain);
+    sub2Gain.connect(bus);
     sub2.start(now);
     sub2.stop(now + 1.2);
 
@@ -291,7 +296,7 @@ export class SoundSystem {
     pressureGain.gain.setValueAtTime(0.96, now);
     pressureGain.gain.exponentialRampToValueAtTime(0.001, now + 1.2);
     pressure.connect(pressureGain);
-    pressureGain.connect(this.masterGain);
+    pressureGain.connect(bus);
     pressure.start(now);
     pressure.stop(now + 0.8);
   }
