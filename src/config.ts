@@ -50,6 +50,10 @@ export const AI = {
   RUSTY_AIM_ACCURACY: 0.2,
   RUSTY_FIRE_RATE: 800,
   RUSTY_CHASE_RANGE: 500,
+  // Desktop-only enemy boosts — mobile is balanced, desktop needs more drama
+  DESKTOP_ENEMY_SPEED_BOOST: 1.4,
+  DESKTOP_ENEMY_ROTATION_BOOST: 1.3,
+  DESKTOP_ENEMY_FIRE_BOOST: 0.67, // ~50% more shots (multiplies fireRate ms gap)
 } as const;
 
 export const COLORS = {

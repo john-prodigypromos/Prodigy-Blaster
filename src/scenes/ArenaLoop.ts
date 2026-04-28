@@ -141,6 +141,8 @@ export interface ArenaState {
   lockedTargetIndex: number;
   // Grace period — enemies don't engage for the first few seconds
   roundStartTime: number;
+  // Desktop-only flags driving extra-aggressive flight behavior
+  isDesktop: boolean;
 }
 
 export function createArenaState(
@@ -157,6 +159,13 @@ export function createArenaState(
   scene.add(playerGeo);
 
   const diff = DIFFICULTY[currentDifficulty];
+
+  // Desktop gets faster, sharper enemies. Mobile is balanced — leave it alone.
+  const isDesktop = !('ontouchstart' in window) && navigator.maxTouchPoints === 0;
+  const enemySpeedBoost = isDesktop ? AI.DESKTOP_ENEMY_SPEED_BOOST : 1;
+  const enemyRotationBoost = isDesktop ? AI.DESKTOP_ENEMY_ROTATION_BOOST : 1;
+  const enemyFireBoost = isDesktop ? AI.DESKTOP_ENEMY_FIRE_BOOST : 1;
+
   const aiCfg: AIConfig = {
     sensitivity: diff.aiSensitivity,
     aggression: diff.aiAggression,
@@ -195,8 +204,18 @@ export function createArenaState(
     enemyGeo.scale.set(bossScale, bossScale, bossScale);
     applyMaterials(enemyGeo, createEnemyMaterials());
 
-    // Spawn within leash range — fight starts immediately
-    const angle = Math.random() * Math.PI * 2;
+    // Spawn within leash range — fight starts immediately.
+    // Bias angles AWAY from the player's forward cone (Three.js default fwd = -Z)
+    // so enemies enter from sides/rear instead of head-on charging through the
+    // crosshair. Also stagger by index so multiple enemies don't bunch up.
+    const FWD_EXCLUDE = Math.PI / 3; // ±60° in front of player is off-limits
+    const arc = Math.PI * 2 - FWD_EXCLUDE * 2;
+    const sliceCount = Math.max(1, levelConfig.enemyCount);
+    const sliceSize = arc / sliceCount;
+    const sliceJitter = (Math.random() - 0.5) * sliceSize * 0.6;
+    // Start from behind player (-Z is forward, so +Z = behind = angle 0 around Y)
+    // Map slice index to angle in the allowed arc, centered behind the player.
+    const angle = Math.PI / 2 + FWD_EXCLUDE + sliceSize * (i + 0.5) + sliceJitter;
     const baseDist = 80 + level * 20; // L1: 100, L2: 120, L3: 140
     const dist = baseDist + Math.random() * 30;
     const elevation = (Math.random() - 0.5) * 40 + i * 20;
@@ -205,7 +224,12 @@ export function createArenaState(
       elevation,
       Math.sin(angle) * dist,
     );
-    enemyGeo.lookAt(0, 0, 0);
+    // Aim slightly off-player so initial velocity is tangent — they curve in
+    // instead of flying straight through center of screen.
+    const tangentOffset = (i % 2 === 0 ? 1 : -1) * dist * 0.5;
+    const lookTargetX = -Math.sin(angle) * tangentOffset;
+    const lookTargetZ = Math.cos(angle) * tangentOffset;
+    enemyGeo.lookAt(lookTargetX, 0, lookTargetZ);
     scene.add(enemyGeo);
 
     const hpMult = isBoss ? (BOSS_HP_MULT[level] ?? 1.5) : 1;
@@ -213,10 +237,10 @@ export function createArenaState(
       group: enemyGeo,
       maxHull: Math.round(diff.enemyHull * levelConfig.enemySpeedBonus * hpMult),
       maxShield: diff.enemyShield * (isBoss ? 1.5 : 1),
-      speedMult: diff.enemySpeedMult * levelConfig.enemySpeedBonus,
+      speedMult: diff.enemySpeedMult * levelConfig.enemySpeedBonus * enemySpeedBoost,
       accelMult: diff.enemyAccelMult,
       dragMult: diff.enemyDragMult,
-      rotationMult: diff.enemyRotationMult * levelConfig.enemyRotationBonus,
+      rotationMult: diff.enemyRotationMult * levelConfig.enemyRotationBonus * enemyRotationBoost,
       isPlayer: false,
     });
     // Give enemies initial forward velocity so they're already flying
@@ -231,7 +255,7 @@ export function createArenaState(
         case 1:
           ai = new BoloTieBehavior3D(
             AI.RUSTY_AIM_ACCURACY * levelConfig.enemyRotationBonus,
-            diff.enemyFireRate * levelConfig.enemyFireRateBonus,
+            diff.enemyFireRate * levelConfig.enemyFireRateBonus * enemyFireBoost,
             diff.enemyChaseRange,
             aiCfg,
           );
@@ -240,7 +264,7 @@ export function createArenaState(
         case 2:
           ai = new BowTieBehavior3D(
             AI.RUSTY_AIM_ACCURACY * levelConfig.enemyRotationBonus,
-            diff.enemyFireRate * levelConfig.enemyFireRateBonus,
+            diff.enemyFireRate * levelConfig.enemyFireRateBonus * enemyFireBoost,
             diff.enemyChaseRange,
             aiCfg,
           );
@@ -249,7 +273,7 @@ export function createArenaState(
         case 3:
           ai = new BishopBehavior3D(
             AI.RUSTY_AIM_ACCURACY * levelConfig.enemyRotationBonus,
-            diff.enemyFireRate * levelConfig.enemyFireRateBonus,
+            diff.enemyFireRate * levelConfig.enemyFireRateBonus * enemyFireBoost,
             diff.enemyChaseRange,
             aiCfg,
           );
@@ -258,7 +282,7 @@ export function createArenaState(
         default:
           ai = new RustyBehavior3D(
             AI.RUSTY_AIM_ACCURACY * levelConfig.enemyRotationBonus,
-            diff.enemyFireRate * levelConfig.enemyFireRateBonus,
+            diff.enemyFireRate * levelConfig.enemyFireRateBonus * enemyFireBoost,
             diff.enemyChaseRange,
             aiCfg,
           );
@@ -267,7 +291,7 @@ export function createArenaState(
     } else {
       ai = new RustyBehavior3D(
         AI.RUSTY_AIM_ACCURACY * levelConfig.enemyRotationBonus,
-        diff.enemyFireRate * levelConfig.enemyFireRateBonus,
+        diff.enemyFireRate * levelConfig.enemyFireRateBonus * enemyFireBoost,
         diff.enemyChaseRange,
         aiCfg,
       );
@@ -312,6 +336,7 @@ export function createArenaState(
     slowMoFired: false,
     lockedTargetIndex: -1,
     roundStartTime: performance.now(),
+    isDesktop,
   };
 }
 
@@ -447,6 +472,16 @@ export function updateArena(
       aiInput.thrust = 0.3; // gentle cruise
       aiInput.yaw *= 0.2;   // minimal steering — lazy drift
       aiInput.pitch *= 0.2;
+    } else if (state.isDesktop) {
+      // Desktop-only vertical weave overlay — push enemies into climbs and dives
+      // so flight isn't dominated by horizontal banking. Per-enemy seed prevents
+      // synchronized bobbing. Two beating frequencies = non-repeating motion.
+      const t = now * 0.001;
+      const seed = i * 1.873;
+      const verticalJink =
+        Math.sin(t * 1.7 + seed) * 0.30 +
+        Math.sin(t * 0.9 + seed * 2.3) * 0.18;
+      aiInput.pitch = Math.max(-1, Math.min(1, aiInput.pitch + verticalJink));
     }
     if (aiInput.fire) {
       if (tryFireWeapon(enemy, boltPool, now, undefined, player)) {
