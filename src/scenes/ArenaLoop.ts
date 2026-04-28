@@ -364,12 +364,12 @@ export function updateArena(
     thrust: combinedThrust,
   };
 
-  // ── Target lock — F key cycles through on-screen enemies within LOCK_RANGE ──
+  // ── Target lock — F key cycles through on-screen enemies within PLAYER_LOCK_RANGE ──
   const cam = state.camera;
   const visibleIndices: number[] = [];
   for (let i = 0; i < enemies.length; i++) {
     if (!enemies[i].alive) continue;
-    if (enemies[i].position.distanceTo(player.position) > WEAPONS.LOCK_RANGE) continue;
+    if (enemies[i].position.distanceTo(player.position) > WEAPONS.PLAYER_LOCK_RANGE) continue;
     _projTmp.copy(enemies[i].position).project(cam);
     if (_projTmp.z < 1 && _projTmp.x > -1.2 && _projTmp.x < 1.2 && _projTmp.y > -1.2 && _projTmp.y < 1.2) {
       visibleIndices.push(i);
@@ -405,15 +405,16 @@ export function updateArena(
       const locked = enemies[state.lockedTargetIndex];
       if (locked && locked.alive) {
         const dist = locked.position.distanceTo(player.position);
-        if (dist <= WEAPONS.LOCK_RANGE) {
+        if (dist <= WEAPONS.PLAYER_LOCK_RANGE) {
           _projTmp.copy(locked.position).project(cam);
-          // Only auto-aim if target is within center 45% of screen and within LOCK_RANGE
+          // Only auto-aim if target is within center 45% of screen and within PLAYER_LOCK_RANGE
           if (Math.abs(_projTmp.x) < 0.45 && Math.abs(_projTmp.y) < 0.45 && _projTmp.z < 1) {
             fireTarget = locked;
-            // Distance factor: 1.0 at ≤50m, ramps linearly to 0.4 at LOCK_RANGE
+            // Distance factor: 1.0 at ≤50m, ramps linearly to 0.4 at PLAYER_LOCK_RANGE
+            // (damage still scales with distance — farther = less damage)
             const distFactor = dist <= 50
               ? 1
-              : Math.max(0.4, 1 - ((dist - 50) / (WEAPONS.LOCK_RANGE - 50)) * 0.6);
+              : Math.max(0.4, 1 - ((dist - 50) / (WEAPONS.PLAYER_LOCK_RANGE - 50)) * 0.6);
             // Centering factor: 1.0 at dead center, ramps linearly to 0.6 at edge of 45% lock zone
             const centerDist = Math.max(Math.abs(_projTmp.x), Math.abs(_projTmp.y));
             const centerFactor = Math.max(0.6, 1 - (centerDist / 0.45) * 0.4);
